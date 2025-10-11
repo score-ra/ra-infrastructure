@@ -1,0 +1,58 @@
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# SSH Keys
+*.pem
+*.key
+id_rsa
+id_ed25519
+*_key
+*_key.pub
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Windows
+desktop.ini
+$RECYCLE.BIN/
+
+# PowerShell
+*.ps1.swp
+
+# WinSCP
+*.ini
+sessions/
+profiles/
+
+# WordPress backups (large files)
+wordpress-backups/
+*.tar.gz
+*.zip
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
