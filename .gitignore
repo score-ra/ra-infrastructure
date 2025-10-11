@@ -1,58 +1,56 @@
-# Logs
-*.log
-logs/
+# Documentation project .gitignore (Obsidian-enabled)
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Obsidian workspace files (personal preferences)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# Keep Obsidian plugin configurations (shared settings)
+!.obsidian/app.json
+!.obsidian/appearance.json
+!.obsidian/community-plugins.json
+!.obsidian/core-plugins.json
+!.obsidian/plugins/
+
+# Build outputs
+_site/
+.jekyll-cache/
+.sass-cache/
+
+# Temporary files
+*.tmp
+*.bak
+*~
+*.autosave
 
 # Environment files
 .env
 .env.local
-.env.*.local
 
-# SSH Keys
-*.pem
-*.key
-id_rsa
-id_ed25519
-*_key
-*_key.pub
+# Video files (large binary assets - configure as needed)
+# Uncomment to exclude all videos from version control
+/*.mp4
+/*.mov
+/*.avi
+/*.webm
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
 
-# Backup files
-*.bak
-*.backup
-*~
+# Or exclude specific video files
+# videos/large-file.mp4
 
-# Temporary files
-*.tmp
-*.temp
-.DS_Store
-Thumbs.db
-
-# Windows
-desktop.ini
-$RECYCLE.BIN/
-
-# PowerShell
-*.ps1.swp
-
-# WinSCP
-*.ini
-sessions/
-profiles/
-
-# WordPress backups (large files)
-wordpress-backups/
-*.tar.gz
-*.zip
-
-# IDE
-.vscode/
-.idea/
-*.sublime-*
-
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-env/
-venv/
+# Large binary assets (if needed)
+# *.psd
+# *.ai
