@@ -8,7 +8,7 @@
 |-------|-------|
 | **Phase** | Phase 1 - Foundation Completion |
 | **Last Updated** | 2025-11-26 |
-| **Last Session** | Architecture planning, published to GitHub |
+| **Last Session** | Infrastructure verification, Python installation |
 
 ## What's Done
 
@@ -22,9 +22,18 @@
 - [x] Published to GitHub: https://github.com/score-ra/ra-infrastructure
 - [x] Architecture plan documented
 - [x] Sprint backlog created
+- [x] Startup verification script (`scripts/startup.ps1`)
+- [x] Docker resource limits configured
 
 ## What's Next (Phase 1)
 
+**IMMEDIATE (after reboot):**
+1. Verify Python 3.13 installation: `python --version`
+2. Install CLI: `cd cli && pip install -e ".[dev]"`
+3. Run startup script: `.\scripts\startup.ps1`
+4. Verify database: `inv db stats`
+
+**THEN continue with:**
 - [ ] Complete site commands (list, create, show, delete)
 - [ ] Create zone commands (list, create, show, delete)
 - [ ] Complete device commands (create, show, update, delete)
@@ -35,7 +44,18 @@
 
 ## Active Blockers
 
-None for Phase 1. See [docs/OPEN-ISSUES.md](docs/OPEN-ISSUES.md) for cross-repo issues.
+- **Python 3.13 just installed** - Reboot required for long path support
+- After reboot, run `.\scripts\startup.ps1` to verify environment
+
+## Infrastructure Status (verified 2025-11-26)
+
+| Component | Status |
+|-----------|--------|
+| Docker Desktop | Running |
+| PostgreSQL container | Running (healthy) on localhost:5432 |
+| pgAdmin container | Running on localhost:5050 |
+| Python 3.13 | Installed (reboot pending) |
+| CLI (inv) | Not yet installed (needs pip install) |
 
 ## Key Documents
 
@@ -43,21 +63,24 @@ None for Phase 1. See [docs/OPEN-ISSUES.md](docs/OPEN-ISSUES.md) for cross-repo 
 |----------|---------|
 | [docs/architecture/PLAN.md](docs/architecture/PLAN.md) | Architecture decisions and design |
 | [docs/architecture/SPRINT-BACKLOG.md](docs/architecture/SPRINT-BACKLOG.md) | Task tracking by phase |
-| [docs/OPEN-ISSUES.md](docs/OPEN-ISSUES.md) | Cross-repo issues to resolve |
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | Setup instructions |
+| [scripts/startup.ps1](scripts/startup.ps1) | Environment verification script |
 
 ## Files Modified This Session
 
 ```
-docs/architecture/PLAN.md (new)
-docs/architecture/SPRINT-BACKLOG.md (new)
-docs/OPEN-ISSUES.md (new)
+scripts/startup.ps1 (new) - Environment verification script
+docker/docker-compose.yml (updated) - Added resource limits
 start-here.md (updated)
 ```
 
 ## Quick Commands
 
-```bash
+```powershell
+# Verify environment (run this first after reboot!)
+.\scripts\startup.ps1
+
+# Or manually:
 # Start database
 cd docker && docker-compose up -d
 
@@ -90,3 +113,4 @@ ruff check cli/ && black --check cli/
 - Database runs on localhost:5432
 - pgAdmin available at localhost:5050
 - GitHub repo: https://github.com/score-ra/ra-infrastructure
+- Docker containers have resource limits (512MB postgres, 256MB pgadmin)
