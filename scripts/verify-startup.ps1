@@ -11,27 +11,58 @@
     - Database migrations are applied
     - Database connection works
 
+    Optionally sends email alerts on failure.
+
 .PARAMETER SkipMigrations
     Skip running database migrations.
+
+.PARAMETER SendAlert
+    Send email alert if startup verification fails.
 
 .PARAMETER Verbose
     Show detailed output.
 
 .EXAMPLE
-    .\startup.ps1
+    .\verify-startup.ps1
 
 .EXAMPLE
-    .\startup.ps1 -SkipMigrations
+    .\verify-startup.ps1 -SkipMigrations
+
+.EXAMPLE
+    .\verify-startup.ps1 -SendAlert
 #>
 
 [CmdletBinding()]
 param(
-    [switch]$SkipMigrations
+    [switch]$SkipMigrations,
+    [switch]$SendAlert
 )
 
 $ErrorActionPreference = "Stop"
 $script:RepoRoot = Split-Path -Parent $PSScriptRoot
 $script:DockerComposePath = Join-Path $RepoRoot "docker\docker-compose.yml"
+$script:LogDir = Join-Path $script:RepoRoot "logs"
+$script:LogFile = Join-Path $script:LogDir "startup.log"
+$script:ConfigFile = Join-Path $script:RepoRoot "config\monitoring.env"
+
+# Ensure logs directory exists
+if (-not (Test-Path $script:LogDir)) {
+    New-Item -ItemType Directory -Path $script:LogDir -Force | Out-Null
+}
+
+function Write-Log {
+    param(
+        [string]$Message,
+        [ValidateSet("INFO", "SUCCESS", "WARNING", "ERROR")]
+        [string]$Level = "INFO"
+    )
+
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logEntry = "[$timestamp] [$Level] $Message"
+
+    # Write to log file
+    Add-Content -Path $script:LogFile -Value $logEntry
+}
 
 function Write-Status {
     param(
@@ -55,7 +86,103 @@ function Write-Status {
     }
 
     Write-Host "$($symbols[$Type]) $Message" -ForegroundColor $colors[$Type]
+
+    # Also write to log file
+    $levelMap = @{ "Info" = "INFO"; "Success" = "SUCCESS"; "Warning" = "WARNING"; "Error" = "ERROR" }
+    Write-Log -Message $Message -Level $levelMap[$Type]
 }
+
+#region Email Functions
+
+function Get-EmailConfig {
+    if (-not (Test-Path $script:ConfigFile)) {
+        return $null
+    }
+
+    $config = @{}
+    Get-Content $script:ConfigFile | ForEach-Object {
+        if ($_ -match "^([^#=]+)=(.*)$") {
+            $config[$Matches[1].Trim()] = $Matches[2].Trim()
+        }
+    }
+
+    return $config
+}
+
+function Send-StartupFailureAlert {
+    param(
+        [hashtable]$Results
+    )
+
+    if (-not $SendAlert) {
+        return
+    }
+
+    $config = Get-EmailConfig
+    if (-not $config) {
+        Write-Status "Cannot send email - no config file" -Type Warning
+        return
+    }
+
+    $hostname = $env:COMPUTERNAME
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+
+    $failedChecks = ($Results.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object { "  - $($_.Key)" }) -join "`n"
+
+    $subject = "[ALERT] ra-infrastructure - Startup Verification Failed"
+    $body = @"
+Startup Verification Alert
+
+Host: $hostname
+Time: $timestamp
+
+The following checks failed:
+$failedChecks
+
+Suggested Actions:
+1. Check Docker Desktop is running
+2. Run: .\scripts\verify-startup.ps1
+3. Check logs: logs\startup.log
+
+--
+ra-infrastructure Startup Monitor
+"@
+
+    try {
+        $smtpServer = $config.SMTP_HOST
+        $smtpPort = [int]$config.SMTP_PORT
+        $smtpUser = $config.SMTP_USER
+        $smtpPassword = $config.SMTP_PASSWORD
+        $alertEmail = $config.ALERT_EMAIL
+
+        if (-not ($smtpServer -and $smtpUser -and $smtpPassword -and $alertEmail)) {
+            Write-Status "Incomplete email configuration" -Type Warning
+            return
+        }
+
+        $securePassword = ConvertTo-SecureString $smtpPassword -AsPlainText -Force
+        $credential = New-Object System.Management.Automation.PSCredential($smtpUser, $securePassword)
+
+        $mailParams = @{
+            From       = $smtpUser
+            To         = $alertEmail
+            Subject    = $subject
+            Body       = $body
+            SmtpServer = $smtpServer
+            Port       = $smtpPort
+            UseSsl     = $true
+            Credential = $credential
+        }
+
+        Send-MailMessage @mailParams
+        Write-Status "Alert email sent" -Type Success
+    }
+    catch {
+        Write-Status "Failed to send email: $_" -Type Error
+    }
+}
+
+#endregion
 
 function Test-DockerDesktop {
     Write-Status "Checking Docker Desktop..." -Type Info
@@ -301,6 +428,8 @@ function Show-Summary {
     }
     else {
         Write-Status "Some checks failed. Please fix the issues above." -Type Error
+        # Send alert email if requested
+        Send-StartupFailureAlert -Results $Results
     }
 
     return $allPassed

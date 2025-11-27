@@ -20,6 +20,16 @@
 | Disk failure | 1 hour | [Tier 4](#tier-4-full-recovery) |
 | PC failure | 1 hour+ | [Tier 4](#tier-4-full-recovery) |
 
+## Available Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts\health-check.ps1` | Check service health |
+| `scripts\verify-startup.ps1` | Verify all services after startup |
+| `scripts\backup.ps1 -Type daily` | Create local backup |
+| `scripts\backup.ps1 -Type weekly` | Create backup and upload to Google Drive |
+| `scripts\restore.ps1 -BackupFile <path>` | Restore from backup |
+
 ---
 
 ## Pre-Recovery Checklist
@@ -136,7 +146,30 @@ Before starting any recovery:
 - Backup file available in `D:\Backups\ra-infrastructure\daily\`
 - Docker Desktop running
 
-### Steps
+### Option A: Using restore.ps1 Script (Recommended)
+
+```powershell
+cd c:\Users\ranand\workspace\personal\software\ra-infrastructure
+
+# List available backups
+dir D:\Backups\ra-infrastructure\daily\ | Sort-Object LastWriteTime -Descending
+
+# Restore from backup (creates safety backup first)
+.\scripts\restore.ps1 -BackupFile "D:\Backups\ra-infrastructure\daily\inventory_2025-11-27.dump.gz"
+
+# Or skip confirmation prompt
+.\scripts\restore.ps1 -BackupFile "D:\Backups\ra-infrastructure\daily\inventory_2025-11-27.dump.gz" -Force
+```
+
+The restore script will:
+1. Create a safety backup of current data (saved to `logs/safety-backups/`)
+2. Decompress the backup if needed
+3. Stop pgAdmin temporarily
+4. Restore the database
+5. Verify the restoration
+6. Restart all services
+
+### Option B: Manual Steps
 
 1. **Stop all services**
    ```powershell
@@ -163,47 +196,17 @@ Before starting any recovery:
    dir D:\Backups\ra-infrastructure\daily\ | Sort-Object LastWriteTime -Descending
 
    # Select the most recent (or specific date)
-   $BACKUP_FILE = "D:\Backups\ra-infrastructure\daily\ra_inventory_2025-11-27.sql.gz"
+   $BACKUP_FILE = "D:\Backups\ra-infrastructure\daily\inventory_2025-11-27.dump.gz"
    ```
 
 5. **Restore the backup**
    ```powershell
-   # Decompress backup
-   gzip -dk $BACKUP_FILE
-
-   # Get SQL file path
-   $SQL_FILE = $BACKUP_FILE -replace '\.gz$', ''
-
-   # Restore using pg_restore
-   docker exec -i inventory-db pg_restore -U inventory -d ra_inventory -c < $SQL_FILE
-
-   # Or if it's a plain SQL dump:
-   # docker exec -i inventory-db psql -U inventory -d ra_inventory < $SQL_FILE
-
-   # Clean up decompressed file
-   Remove-Item $SQL_FILE
+   # Use the restore script
+   cd c:\Users\ranand\workspace\personal\software\ra-infrastructure
+   .\scripts\restore.ps1 -BackupFile $BACKUP_FILE -Force
    ```
 
-6. **Alternative: Restore using psql from host**
-   ```powershell
-   # Decompress
-   gzip -dk $BACKUP_FILE
-   $SQL_FILE = $BACKUP_FILE -replace '\.gz$', ''
-
-   # Restore (assumes psql is in PATH)
-   $env:PGPASSWORD = "inventory_dev_password"
-   psql -h localhost -U inventory -d ra_inventory -f $SQL_FILE
-
-   # Clean up
-   Remove-Item $SQL_FILE
-   ```
-
-7. **Start remaining services**
-   ```powershell
-   docker-compose up -d
-   ```
-
-8. **Verify restoration**
+6. **Verify restoration**
    ```powershell
    # Check record counts
    inv db stats

@@ -1,0 +1,30 @@
+# rclone Configuration for Google Drive Backup
+#
+# This file is a placeholder. Do NOT copy this file directly.
+# Instead, run 'rclone config' to set up your Google Drive connection.
+#
+# Setup Instructions:
+# 1. Install rclone: winget install rclone
+# 2. Run: rclone config
+# 3. Choose: n (New remote)
+# 4. Name: gdrive
+# 5. Storage: Google Drive (typically option 18 or search for "drive")
+# 6. Leave client_id and client_secret blank (press Enter)
+# 7. Scope: 1 (Full access)
+# 8. Leave service_account_file blank
+# 9. Edit advanced config: n
+# 10. Use auto config: y
+# 11. Complete OAuth in browser
+# 12. Configure as Shared Drive: y
+# 13. Select the "ra-all-purpose-backup" shared drive
+# 14. Confirm settings: y
+#
+# Test your configuration:
+#   rclone ls gdrive:ra-infrastructure-backup/
+#
+# The backup script expects:
+# - Remote name: gdrive
+# - Folder path: ra-infrastructure-backup/
+#
+# Your actual config will be stored at:
+# Windows: %APPDATA%\rclone\rclone.conf

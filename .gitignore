@@ -62,6 +62,13 @@ secrets/
 htmlcov/
 .pytest_cache/
 
+# Logs directory
+logs/
+
+# Monitoring config (contains credentials)
+config/monitoring.env
+config/rclone.conf
+
 # Claude Code local settings (entire folder)
 .claude/
 
