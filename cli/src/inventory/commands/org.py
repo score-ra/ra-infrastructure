@@ -40,7 +40,7 @@ def list_orgs():
             row["name"],
             row["slug"],
             row["type"],
-            "✓" if row["is_active"] else "✗",
+            "Yes" if row["is_active"] else "No",
             row["created_at"].strftime("%Y-%m-%d"),
         )
 
@@ -110,7 +110,7 @@ def create(
                 result = cur.fetchone()
                 conn.commit()
 
-                console.print(f"[green]✓[/green] Created organization: {result['slug']}")
+                console.print(f"[green][OK][/green] Created organization: {result['slug']}")
 
             except Exception as e:
                 conn.rollback()
@@ -139,4 +139,4 @@ def delete(
                 raise typer.Exit(1)
 
             conn.commit()
-            console.print(f"[green]✓[/green] Deleted organization: {slug}")
+            console.print(f"[green][OK][/green] Deleted organization: {slug}")

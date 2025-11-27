@@ -6,111 +6,74 @@
 
 | Field | Value |
 |-------|-------|
-| **Phase** | Phase 1 - Foundation Completion |
-| **Last Updated** | 2025-11-26 |
-| **Last Session** | Infrastructure verification, Python installation |
+| **Phase** | Foundation Complete |
+| **Last Updated** | 2025-11-27 |
+| **Purpose** | Central infrastructure database for other repositories |
+
+## What This Repository Is
+
+**ra-infrastructure** is a standalone PostgreSQL database and CLI for managing:
+- **Organizations** - Multi-tenant support
+- **Sites** - Physical locations
+- **Zones** - Logical areas within sites
+- **Devices** - All infrastructure devices
+- **Networks** - Network configurations and IP allocations
+
+This database is designed to be consumed by **other repositories** for their device/network data needs.
 
 ## What's Done
 
-- [x] Database schema designed (4 migrations)
-- [x] Docker infrastructure (PostgreSQL + pgAdmin)
-- [x] CLI skeleton with Typer framework
-- [x] Organization commands (list, show, create, delete)
-- [x] Database utility commands (migrate, seed, reset, stats)
-- [x] Device list command (partial)
-- [x] Seed data for Anand Family organization
-- [x] Published to GitHub: https://github.com/score-ra/ra-infrastructure
-- [x] Architecture plan documented
-- [x] Sprint backlog created
-- [x] Startup verification script (`scripts/startup.ps1`)
-- [x] Docker resource limits configured
+- [x] Database schema (4 migrations)
+- [x] Docker infrastructure (PostgreSQL 16 + pgAdmin)
+- [x] CLI with Typer (`inv` command)
+- [x] Full CRUD for all entities (org, site, zone, device, network)
+- [x] Repository pattern for db layer
+- [x] Pydantic models for validation
+- [x] 79 tests passing
 
-## What's Next (Phase 1)
+## For External Repositories
 
-**IMMEDIATE (after reboot):**
-1. Verify Python 3.13 installation: `python --version`
-2. Install CLI: `cd cli && pip install -e ".[dev]"`
-3. Run startup script: `.\scripts\startup.ps1`
-4. Verify database: `inv db stats`
+See **[docs/DATABASE.md](docs/DATABASE.md)** for:
+- Connection details
+- Schema documentation
+- Example queries
+- Python connection examples
 
-**THEN continue with:**
-- [ ] Complete site commands (list, create, show, delete)
-- [ ] Create zone commands (list, create, show, delete)
-- [ ] Complete device commands (create, show, update, delete)
-- [ ] Complete network commands (list, show, create)
-- [ ] Add repository pattern to db layer
-- [ ] Add Pydantic models for validation
-- [ ] Achieve 80% test coverage
-
-## Active Blockers
-
-- **Python 3.13 just installed** - Reboot required for long path support
-- After reboot, run `.\scripts\startup.ps1` to verify environment
-
-## Infrastructure Status (verified 2025-11-26)
+## Infrastructure Status
 
 | Component | Status |
 |-----------|--------|
-| Docker Desktop | Running |
-| PostgreSQL container | Running (healthy) on localhost:5432 |
-| pgAdmin container | Running on localhost:5050 |
-| Python 3.13 | Installed (reboot pending) |
-| CLI (inv) | Not yet installed (needs pip install) |
+| PostgreSQL | `localhost:5432` |
+| pgAdmin | `localhost:5050` |
+| Database | `ra_inventory` |
+| User | `inventory` |
+
+## Quick Commands
+
+```powershell
+# Start database
+cd docker && docker-compose up -d
+
+# Check status
+inv db stats
+
+# Install CLI
+cd cli && pip install -e ".[dev]"
+
+# Run tests
+cd cli && pytest
+```
 
 ## Key Documents
 
 | Document | Purpose |
 |----------|---------|
-| [docs/architecture/PLAN.md](docs/architecture/PLAN.md) | Architecture decisions and design |
-| [docs/architecture/SPRINT-BACKLOG.md](docs/architecture/SPRINT-BACKLOG.md) | Task tracking by phase |
-| [docs/QUICKSTART.md](docs/QUICKSTART.md) | Setup instructions |
-| [scripts/startup.ps1](scripts/startup.ps1) | Environment verification script |
-
-## Files Modified This Session
-
-```
-scripts/startup.ps1 (new) - Environment verification script
-docker/docker-compose.yml (updated) - Added resource limits
-start-here.md (updated)
-```
-
-## Quick Commands
-
-```powershell
-# Verify environment (run this first after reboot!)
-.\scripts\startup.ps1
-
-# Or manually:
-# Start database
-cd docker && docker-compose up -d
-
-# Install CLI (editable)
-cd cli && pip install -e ".[dev]"
-
-# Run migrations and seed
-inv db migrate && inv db seed
-
-# Run tests
-cd cli && pytest
-
-# Check code quality
-ruff check cli/ && black --check cli/
-```
-
-## Architecture Decisions
-
-| Decision | Choice |
-|----------|--------|
-| API Layer | CLI only (no REST API) |
-| Web UI | FastAPI + HTMX + Tailwind (embedded) |
-| Integration Priority | HomeSeer first |
-| Multi-Site | 4+ sites supported |
-| Deployment | Single Windows machine |
-| Security | VPN access only |
+| [docs/DATABASE.md](docs/DATABASE.md) | **External repository integration guide** |
+| [docs/architecture/SPRINT-BACKLOG.md](docs/architecture/SPRINT-BACKLOG.md) | Completed task tracking |
+| [CLAUDE.md](CLAUDE.md) | Development instructions |
 
 ## Notes
 
 - Database runs on localhost:5432
 - pgAdmin available at localhost:5050
 - GitHub repo: https://github.com/score-ra/ra-infrastructure
-- Docker containers have resource limits (512MB postgres, 256MB pgadmin)

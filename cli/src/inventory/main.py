@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 
 from inventory import __version__
-from inventory.commands import db, device, network, org, site
+from inventory.commands import db, device, network, org, site, zone
 
 # Create main app
 app = typer.Typer(
@@ -24,6 +24,7 @@ app.add_typer(org.app, name="org", help="Organization management")
 app.add_typer(site.app, name="site", help="Site management")
 app.add_typer(device.app, name="device", help="Device management")
 app.add_typer(network.app, name="network", help="Network management")
+app.add_typer(zone.app, name="zone", help="Zone management")
 app.add_typer(db.app, name="db", help="Database operations")
 
 
@@ -41,12 +42,12 @@ def status():
     status = get_connection_status()
 
     if status["connected"]:
-        console.print("[green]✓[/green] Database connected")
+        console.print("[green][OK][/green] Database connected")
         console.print(f"  Host: {status['host']}")
         console.print(f"  Database: {status['database']}")
         console.print(f"  Version: {status['version']}")
     else:
-        console.print("[red]✗[/red] Database not connected")
+        console.print("[red][FAIL][/red] Database not connected")
         console.print(f"  Error: {status['error']}")
 
 

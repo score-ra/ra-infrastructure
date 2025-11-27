@@ -1,6 +1,5 @@
 """Tests for database commands."""
 
-import pytest
 
 
 class TestDbMigrate:

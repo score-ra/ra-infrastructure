@@ -57,7 +57,7 @@ def list_sites(
             row["slug"],
             row["org_name"],
             row["site_type"] or "-",
-            "✓" if row["is_primary"] else "",
+            "Yes" if row["is_primary"] else "",
             row["city"] or "-",
         )
 
@@ -154,7 +154,9 @@ def create(
             try:
                 cur.execute(
                     """
-                    INSERT INTO sites (organization_id, name, slug, site_type, city, timezone, is_primary)
+                    INSERT INTO sites (
+                        organization_id, name, slug, site_type, city, timezone, is_primary
+                    )
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id, slug
                 """,
@@ -163,9 +165,35 @@ def create(
                 result = cur.fetchone()
                 conn.commit()
 
-                console.print(f"[green]✓[/green] Created site: {result['slug']}")
+                console.print(f"[green][OK][/green] Created site: {result['slug']}")
 
             except Exception as e:
                 conn.rollback()
                 console.print(f"[red]Error:[/red] {e}")
                 raise typer.Exit(1)
+
+
+@app.command()
+def delete(
+    slug: str = typer.Argument(..., help="Site slug"),
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Delete a site and all its data."""
+    if not confirm:
+        confirm = typer.confirm(
+            f"Delete site '{slug}' and all its data (zones, devices, networks)?"
+        )
+        if not confirm:
+            raise typer.Abort()
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM sites WHERE slug = %s RETURNING id", (slug,))
+            result = cur.fetchone()
+
+            if not result:
+                console.print(f"[red]Site not found:[/red] {slug}")
+                raise typer.Exit(1)
+
+            conn.commit()
+            console.print(f"[green][OK][/green] Deleted site: {slug}")

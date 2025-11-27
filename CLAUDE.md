@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Central infrastructure repository for device inventory, network management, and multi-organization support. This is a personal project for home automation infrastructure management.
+Central infrastructure database for device inventory, network management, and multi-organization support. This repository provides the PostgreSQL database that other repositories can consume for device/network data.
 
 ## Quick Start
 

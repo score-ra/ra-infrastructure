@@ -67,7 +67,7 @@ def list_networks(
             identifier,
             row["site_name"],
             str(row["device_count"]),
-            "✓" if row["is_primary"] else "",
+            "Yes" if row["is_primary"] else "",
         )
 
     console.print(table)
@@ -118,7 +118,7 @@ def show(slug: str = typer.Argument(..., help="Network slug")):
     console.print(f"  Primary: {'Yes' if network['is_primary'] else 'No'}")
 
     if network["cidr"]:
-        console.print(f"\n[bold]IP Network[/bold]")
+        console.print("\n[bold]IP Network[/bold]")
         console.print(f"  CIDR: {network['cidr']}")
         if network["gateway_ip"]:
             console.print(f"  Gateway: {network['gateway_ip']}")
@@ -126,7 +126,7 @@ def show(slug: str = typer.Argument(..., help="Network slug")):
             console.print(f"  VLAN: {network['vlan_id']}")
 
     if network["ssid"]:
-        console.print(f"\n[bold]WiFi[/bold]")
+        console.print("\n[bold]WiFi[/bold]")
         console.print(f"  SSID: {network['ssid']}")
         if network["frequency"]:
             console.print(f"  Frequency: {network['frequency']}")
@@ -134,7 +134,7 @@ def show(slug: str = typer.Argument(..., help="Network slug")):
             console.print(f"  Security: {network['security_type']}")
 
     if network["network_type"] in ["zwave", "zigbee"]:
-        console.print(f"\n[bold]Mesh Network[/bold]")
+        console.print("\n[bold]Mesh Network[/bold]")
         if network["controller_name"]:
             console.print(f"  Controller: {network['controller_name']}")
         if network["channel"]:
@@ -142,7 +142,7 @@ def show(slug: str = typer.Argument(..., help="Network slug")):
         if network["pan_id"]:
             console.print(f"  PAN ID: {network['pan_id']}")
 
-    console.print(f"\n[bold]Statistics[/bold]")
+    console.print("\n[bold]Statistics[/bold]")
     console.print(f"  Devices: {device_count}")
     console.print(f"  IP Allocations: {ip_count}")
 
@@ -224,7 +224,102 @@ def ips(
             row["hostname"] or "-",
             row["device_name"] or "-",
             row["allocation_type"],
-            "✓" if row["is_active"] else "✗",
+            "Yes" if row["is_active"] else "No",
         )
 
     console.print(table)
+
+
+@app.command()
+def create(
+    name: str = typer.Argument(..., help="Network name"),
+    network_type: str = typer.Option(
+        ..., "--type", "-t", help="Type: ethernet, wifi, zwave, zigbee, bluetooth, etc."
+    ),
+    site: str = typer.Option(..., "--site", "-s", help="Site slug"),
+    cidr: str = typer.Option(None, "--cidr", help="CIDR notation (e.g., 192.168.1.0/24)"),
+    gateway: str = typer.Option(None, "--gateway", "-g", help="Gateway IP address"),
+    vlan: int = typer.Option(None, "--vlan", help="VLAN ID"),
+    ssid: str = typer.Option(None, "--ssid", help="WiFi SSID"),
+    frequency: str = typer.Option(None, "--frequency", help="WiFi frequency: 2.4GHz, 5GHz"),
+    security: str = typer.Option(None, "--security", help="Security type: WPA2, WPA3, WEP, Open"),
+    channel: int = typer.Option(None, "--channel", help="Channel for mesh networks"),
+    primary: bool = typer.Option(False, "--primary", "-p", help="Set as primary network"),
+):
+    """Create a new network."""
+    import re
+
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            # Get site ID
+            cur.execute("SELECT id FROM sites WHERE slug = %s", (site,))
+            site_row = cur.fetchone()
+
+            if not site_row:
+                console.print(f"[red]Site not found:[/red] {site}")
+                raise typer.Exit(1)
+
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO networks (
+                        site_id, name, slug, network_type,
+                        cidr, gateway_ip, vlan_id,
+                        ssid, frequency, security_type,
+                        channel, is_primary
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, slug
+                """,
+                    (
+                        site_row["id"],
+                        name,
+                        slug,
+                        network_type,
+                        cidr,
+                        gateway,
+                        vlan,
+                        ssid,
+                        frequency,
+                        security,
+                        channel,
+                        primary,
+                    ),
+                )
+                result = cur.fetchone()
+                conn.commit()
+
+                console.print(f"[green][OK][/green] Created network: {result['slug']}")
+
+            except Exception as e:
+                conn.rollback()
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1)
+
+
+@app.command()
+def delete(
+    slug: str = typer.Argument(..., help="Network slug"),
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Delete a network."""
+    if not confirm:
+        confirm = typer.confirm(
+            f"Delete network '{slug}'? Devices on this network will become unassigned."
+        )
+        if not confirm:
+            raise typer.Abort()
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM networks WHERE slug = %s RETURNING id", (slug,))
+            result = cur.fetchone()
+
+            if not result:
+                console.print(f"[red]Network not found:[/red] {slug}")
+                raise typer.Exit(1)
+
+            conn.commit()
+            console.print(f"[green][OK][/green] Deleted network: {slug}")

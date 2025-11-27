@@ -62,8 +62,8 @@ secrets/
 htmlcov/
 .pytest_cache/
 
-# Claude Code local settings
-.claude/settings.local.json
+# Claude Code local settings (entire folder)
+.claude/
 
 # Windows artifacts
 nul

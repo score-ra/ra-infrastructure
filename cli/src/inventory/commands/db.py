@@ -2,7 +2,6 @@
 Database management commands.
 """
 
-from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -50,10 +49,10 @@ def migrate(
                 with conn.cursor() as cur:
                     cur.execute(sql)
                 conn.commit()
-                console.print("[green]✓[/green]")
+                console.print("[green][OK][/green]")
             except Exception as e:
                 conn.rollback()
-                console.print(f"[red]✗[/red] {e}")
+                console.print(f"[red][FAIL][/red] {e}")
                 raise typer.Exit(1)
 
     console.print("[green]All migrations completed successfully[/green]")
@@ -94,10 +93,10 @@ def seed(
                 with conn.cursor() as cur:
                     cur.execute(sql)
                 conn.commit()
-                console.print("[green]✓[/green]")
+                console.print("[green][OK][/green]")
             except Exception as e:
                 conn.rollback()
-                console.print(f"[red]✗[/red] {e}")
+                console.print(f"[red][FAIL][/red] {e}")
                 raise typer.Exit(1)
 
     console.print("[green]Seeding completed successfully[/green]")

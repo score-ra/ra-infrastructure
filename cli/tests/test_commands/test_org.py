@@ -1,6 +1,5 @@
 """Tests for organization commands."""
 
-import pytest
 
 
 class TestOrgList:
