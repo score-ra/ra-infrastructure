@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # Paths
+    project_root: Path = Path(__file__).parent.parent.parent.parent
     migrations_path: Path = Path(__file__).parent.parent.parent.parent / "database" / "migrations"
     seeds_path: Path = Path(__file__).parent.parent.parent.parent / "database" / "seeds"
 

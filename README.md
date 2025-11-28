@@ -9,6 +9,7 @@ This repository provides:
 - **Multi-Organization Support** - Manage residential, office, and lab environments
 - **Network Awareness** - Track networks (WiFi, Ethernet, Z-Wave, Zigbee, Bluetooth)
 - **CLI Tools** - Python-based command-line interface for management
+- **Auto-Generated Schema Diagrams** - ER diagrams generated directly from live database
 - **REST API** - Node.js API for integrations (future)
 
 ## Architecture
@@ -95,6 +96,30 @@ inv network scan --site primary-residence
 # Reports
 inv report devices --format csv > devices.csv
 inv report topology --site primary-residence
+
+# Database schema diagram
+inv db schema                      # Generate PNG diagram
+inv db schema -f html              # Generate full HTML documentation
+```
+
+## Schema Diagram
+
+Generate an up-to-date ER diagram directly from the live database:
+
+```bash
+# Generate PNG diagram (requires Docker)
+inv db schema
+
+# Output: docs/schema.png
+```
+
+This ensures the diagram always matches the actual database schema - no manual maintenance required. The command uses [SchemaSpy](https://schemaspy.org/) via Docker to introspect the database and generate the diagram.
+
+For full interactive documentation with all tables, columns, and relationships:
+
+```bash
+inv db schema -f html
+# Open docs/schema/index.html in a browser
 ```
 
 ## Database Access

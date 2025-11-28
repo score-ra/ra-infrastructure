@@ -74,3 +74,17 @@ config/rclone.conf
 
 # Windows artifacts
 nul
+
+# SchemaSpy auto-generated files (regenerate with: inv db schema -f html)
+docs/bower/
+docs/fonts/
+docs/images/
+docs/routines/
+docs/tables/
+docs/schema/
+docs/*.html
+docs/*.js
+docs/*.css
+docs/*.xml
+docs/*.txt
+docs/diagrams/

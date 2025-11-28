@@ -2,6 +2,9 @@
 Database management commands.
 """
 
+import subprocess
+import sys
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -198,3 +201,146 @@ def stats():
         table.add_row(entity, str(count))
 
     console.print(table)
+
+
+@app.command()
+def schema(
+    output: str = typer.Option(
+        "docs/schema", "--output", "-o", help="Output path (without extension)"
+    ),
+    format: str = typer.Option(
+        "png", "--format", "-f", help="Output format: png, svg, pdf, or html"
+    ),
+):
+    """Generate schema diagram from live database using SchemaSpy.
+
+    Requires Docker to be running. Generates an ER diagram directly from
+    the database, ensuring the diagram always matches the actual schema.
+
+    Examples:
+        inv db schema                      # Generate PNG to docs/schema.png
+        inv db schema -f svg               # Generate SVG
+        inv db schema -o my-schema -f pdf  # Generate PDF to my-schema.pdf
+        inv db schema -f html              # Generate full HTML documentation
+    """
+    settings = get_settings()
+
+    # Determine output path
+    output_path = Path(output)
+    if not output_path.is_absolute():
+        # Relative to project root
+        output_path = settings.project_root / output
+
+    # For HTML, output is a directory; for others, it's a file
+    if format == "html":
+        output_dir = output_path
+        output_file = output_dir / "index.html"
+    else:
+        output_dir = output_path.parent
+        output_file = output_path.with_suffix(f".{format}")
+
+    # Ensure output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    console.print(f"[bold]Generating schema diagram...[/bold]")
+    console.print(f"  Output: {output_file}")
+    console.print(f"  Format: {format}")
+
+    # Check if Docker is available
+    try:
+        subprocess.run(
+            ["docker", "info"],
+            capture_output=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        console.print("[red]Error: Docker is not running or not installed[/red]")
+        console.print("Please start Docker and try again.")
+        raise typer.Exit(1)
+
+    # Use SchemaSpy Docker image to generate diagram
+    # SchemaSpy generates HTML documentation with ER diagrams
+    # Use Docker network to connect to inventory-db container (works on Windows/Mac/Linux)
+    # Note: SchemaSpy image has default -o /output, so we just mount our dir there
+    docker_cmd = [
+        "docker",
+        "run",
+        "--rm",
+        "--network=inventory_network",  # Connect to same network as database
+        "-v",
+        f"{output_dir}:/output",
+        "schemaspy/schemaspy:latest",
+        "-t",
+        "pgsql",
+        "-host",
+        "inventory-db",  # Container name on the Docker network
+        "-port",
+        "5432",
+        "-db",
+        settings.db_name,
+        "-u",
+        settings.db_user,
+        "-p",
+        settings.db_password,
+        "-s",
+        "public",
+    ]
+
+    # For non-HTML formats, we generate HTML then extract the diagram
+    console.print("[dim]Running SchemaSpy via Docker...[/dim]")
+
+    try:
+        result = subprocess.run(
+            docker_cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,  # 2 minute timeout
+        )
+
+        if result.returncode != 0:
+            console.print(f"[red]SchemaSpy failed:[/red]")
+            console.print(result.stderr)
+            raise typer.Exit(1)
+
+        # SchemaSpy generates diagrams in diagrams/ subdirectory
+        diagrams_dir = output_dir / "diagrams"
+        summary_diagram = diagrams_dir / "summary" / "relationships.real.large.png"
+
+        if format == "html":
+            console.print(f"[green]HTML documentation generated at:[/green] {output_dir}")
+            console.print(f"  Open {output_dir}/index.html in a browser")
+        elif format == "png":
+            # Copy the main diagram to the requested output location
+            if summary_diagram.exists():
+                import shutil
+
+                shutil.copy(summary_diagram, output_file)
+                console.print(f"[green]Schema diagram saved to:[/green] {output_file}")
+            else:
+                # Fallback to the compact diagram
+                compact_diagram = diagrams_dir / "summary" / "relationships.real.compact.png"
+                if compact_diagram.exists():
+                    import shutil
+
+                    shutil.copy(compact_diagram, output_file)
+                    console.print(f"[green]Schema diagram saved to:[/green] {output_file}")
+                else:
+                    console.print("[yellow]Diagram generated but not found at expected path[/yellow]")
+                    console.print(f"Check {diagrams_dir} for available diagrams")
+        elif format in ("svg", "pdf"):
+            console.print(f"[yellow]SchemaSpy generates PNG by default.[/yellow]")
+            console.print(f"HTML output includes SVG diagrams at: {diagrams_dir}")
+            # Still save the PNG
+            if summary_diagram.exists():
+                import shutil
+
+                png_output = output_path.with_suffix(".png")
+                shutil.copy(summary_diagram, png_output)
+                console.print(f"[green]PNG diagram saved to:[/green] {png_output}")
+
+    except subprocess.TimeoutExpired:
+        console.print("[red]SchemaSpy timed out after 2 minutes[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]Error running SchemaSpy:[/red] {e}")
+        raise typer.Exit(1)

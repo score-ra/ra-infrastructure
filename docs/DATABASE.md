@@ -2,6 +2,40 @@
 
 This document describes how external repositories can connect to and use the ra-infrastructure database.
 
+---
+
+## Schema Ownership Policy
+
+**IMPORTANT: The database schema is owned and managed exclusively by the `ra-infrastructure` repository.**
+
+### For External Repositories
+
+- **READ-ONLY ACCESS**: External repositories may query the database but must NOT create, alter, or drop tables
+- **NO DIRECT SCHEMA CHANGES**: Do not include migration files that modify this database's structure
+- **CHANGE REQUEST PROCESS**: If schema changes are needed, submit a Change Request (CR) to the ra-infrastructure repository:
+  1. Create an issue in `ra-infrastructure` describing the requirement
+  2. Tag it with `schema-change-request`
+  3. Include: use case, proposed changes, affected queries, and urgency
+  4. Wait for approval before proceeding
+- **SCHEMA REFERENCE**: Always refer to this document or run `inv db schema` for the current schema
+
+### Schema Diagram
+
+View the current schema as a visual ER diagram:
+
+```bash
+# Generate PNG diagram (in ra-infrastructure repo)
+inv db schema
+
+# Output: docs/schema.png
+```
+
+Or view the auto-generated [schema.png](schema.png) in this docs folder.
+
+For full interactive documentation: `inv db schema -f html` then open `docs/schema/index.html`.
+
+---
+
 ## Connection Details
 
 | Setting | Value |
