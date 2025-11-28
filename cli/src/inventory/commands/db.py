@@ -2,9 +2,13 @@
 Database management commands.
 """
 
+import smtplib
 import subprocess
 import time
+from datetime import datetime
+from email.mime.text import MIMEText
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -68,6 +72,53 @@ def _get_compose_command() -> list:
 
     # Fall back to old syntax (docker-compose)
     return ["docker-compose"]
+
+
+def _is_healthy() -> tuple[bool, str]:
+    """Check if database is healthy. Returns (is_healthy, reason)."""
+    container = _get_container_status()
+    if not container["running"]:
+        return False, f"Container {CONTAINER_NAME} is {container['status']}"
+
+    db = _test_db_connection()
+    if not db["connected"]:
+        return False, f"Database connection failed: {db['error']}"
+
+    return True, f"Healthy (latency: {db['latency_ms']}ms)"
+
+
+def _send_email(
+    to_email: str,
+    subject: str,
+    body: str,
+    smtp_host: str = "localhost",
+    smtp_port: int = 25,
+    smtp_user: Optional[str] = None,
+    smtp_password: Optional[str] = None,
+    use_tls: bool = False,
+) -> bool:
+    """Send an email notification. Returns True on success."""
+    try:
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = smtp_user or f"db-monitor@{smtp_host}"
+        msg["To"] = to_email
+
+        if use_tls:
+            server = smtplib.SMTP(smtp_host, smtp_port)
+            server.starttls()
+        else:
+            server = smtplib.SMTP(smtp_host, smtp_port)
+
+        if smtp_user and smtp_password:
+            server.login(smtp_user, smtp_password)
+
+        server.sendmail(msg["From"], [to_email], msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        console.print(f"[red]Failed to send email:[/red] {e}")
+        return False
 
 
 @app.command()
@@ -259,6 +310,129 @@ def restart():
     except subprocess.TimeoutExpired:
         console.print("[red]timeout[/red]")
         raise typer.Exit(1)
+
+
+@app.command()
+def watch(
+    interval: int = typer.Option(30, "--interval", "-i", help="Check interval in seconds"),
+    email: Optional[str] = typer.Option(None, "--email", "-e", help="Email address (or use INV_ALERT_EMAIL env var)"),
+    smtp_host: Optional[str] = typer.Option(None, "--smtp-host", help="SMTP server host (or use INV_SMTP_HOST env var)"),
+    smtp_port: Optional[int] = typer.Option(None, "--smtp-port", help="SMTP server port (or use INV_SMTP_PORT env var)"),
+    smtp_user: Optional[str] = typer.Option(None, "--smtp-user", help="SMTP username (or use INV_SMTP_USER env var)"),
+    smtp_password: Optional[str] = typer.Option(None, "--smtp-password", help="SMTP password (or use INV_SMTP_PASSWORD env var)"),
+    smtp_tls: Optional[bool] = typer.Option(None, "--smtp-tls", help="Use TLS for SMTP (or use INV_SMTP_TLS env var)"),
+    webhook: Optional[str] = typer.Option(None, "--webhook", "-w", help="Webhook URL (or use INV_ALERT_WEBHOOK env var)"),
+):
+    """Watch database health and send notifications on state changes.
+
+    Monitors the database continuously and sends email notifications when
+    the database goes down or comes back up.
+
+    Configuration can be provided via command line options or environment variables
+    (set in .env file). Command line options override environment variables.
+
+    Examples:
+        inv db watch                                    # Use .env settings
+        inv db watch --email you@example.com            # Override email only
+        inv db watch -i 60                              # Check every 60 seconds
+
+    Press Ctrl+C to stop watching.
+    """
+    settings = get_settings()
+
+    # Use settings as defaults, CLI options override
+    effective_email = email or settings.alert_email
+    effective_smtp_host = smtp_host or settings.smtp_host
+    effective_smtp_port = smtp_port or settings.smtp_port
+    effective_smtp_user = smtp_user or settings.smtp_user
+    effective_smtp_password = smtp_password or settings.smtp_password
+    effective_smtp_tls = smtp_tls if smtp_tls is not None else settings.smtp_tls
+    effective_webhook = webhook or settings.alert_webhook
+
+    console.print("[bold]Database Health Monitor[/bold]")
+    console.print("-" * 30)
+    console.print(f"Interval:     {interval}s")
+    console.print(f"Email:        {effective_email or '[dim]disabled[/dim]'}")
+    if effective_webhook:
+        console.print(f"Webhook:      {effective_webhook}")
+    console.print("-" * 30)
+    console.print("[dim]Press Ctrl+C to stop[/dim]\n")
+
+    # Track previous state for change detection
+    previous_healthy: Optional[bool] = None
+    check_count = 0
+
+    try:
+        while True:
+            check_count += 1
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            healthy, reason = _is_healthy()
+
+            # Determine if state changed
+            state_changed = previous_healthy is not None and healthy != previous_healthy
+
+            # Log status
+            status_icon = "[green]OK[/green]" if healthy else "[red]DOWN[/red]"
+            console.print(f"[{now}] {status_icon} - {reason}")
+
+            # Send notification on state change
+            if state_changed:
+                if healthy:
+                    subject = f"[RECOVERED] Database {CONTAINER_NAME} is UP"
+                    body = f"Database {CONTAINER_NAME} has recovered.\n\nTime: {now}\nStatus: {reason}"
+                else:
+                    subject = f"[ALERT] Database {CONTAINER_NAME} is DOWN"
+                    body = f"Database {CONTAINER_NAME} is down!\n\nTime: {now}\nReason: {reason}"
+
+                console.print(f"  [yellow]State changed: {'UP' if healthy else 'DOWN'}[/yellow]")
+
+                # Send email notification
+                if effective_email:
+                    console.print(f"  Sending email to {effective_email}...", end=" ")
+                    success = _send_email(
+                        to_email=effective_email,
+                        subject=subject,
+                        body=body,
+                        smtp_host=effective_smtp_host,
+                        smtp_port=effective_smtp_port,
+                        smtp_user=effective_smtp_user,
+                        smtp_password=effective_smtp_password,
+                        use_tls=effective_smtp_tls,
+                    )
+                    if success:
+                        console.print("[green]sent[/green]")
+                    else:
+                        console.print("[red]failed[/red]")
+
+                # Send webhook notification
+                if effective_webhook:
+                    console.print(f"  Sending webhook...", end=" ")
+                    try:
+                        import urllib.request
+                        import json
+
+                        data = json.dumps({
+                            "status": "up" if healthy else "down",
+                            "container": CONTAINER_NAME,
+                            "reason": reason,
+                            "timestamp": now,
+                        }).encode("utf-8")
+                        req = urllib.request.Request(
+                            effective_webhook,
+                            data=data,
+                            headers={"Content-Type": "application/json"},
+                        )
+                        urllib.request.urlopen(req, timeout=10)
+                        console.print("[green]sent[/green]")
+                    except Exception as e:
+                        console.print(f"[red]failed[/red] - {e}")
+
+            previous_healthy = healthy
+            time.sleep(interval)
+
+    except KeyboardInterrupt:
+        console.print(f"\n[dim]Stopped after {check_count} checks[/dim]")
+        raise typer.Exit(0)
 
 
 @app.command()

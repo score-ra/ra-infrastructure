@@ -47,6 +47,43 @@ inv db status
 - Database connection test result
 - Last health check timestamp
 
+### 4. Watch Command (Continuous Monitoring)
+
+```bash
+inv db watch [OPTIONS]
+```
+
+**Options:**
+- `--interval, -i` - Check interval in seconds (default: 30)
+- `--email, -e` - Email address for notifications
+- `--smtp-host` - SMTP server host (default: localhost)
+- `--smtp-port` - SMTP server port (default: 25)
+- `--smtp-user` - SMTP username for authentication
+- `--smtp-password` - SMTP password for authentication
+- `--smtp-tls` - Use TLS for SMTP connection
+- `--webhook, -w` - Webhook URL for notifications (sends JSON POST)
+
+**Behavior:**
+- Monitors database health continuously
+- Sends notifications only on state changes (DOWN or RECOVERED)
+- Logs each check to console with timestamp
+- Press Ctrl+C to stop
+
+**Examples:**
+```bash
+# Console output only
+inv db watch
+
+# Email notifications via local SMTP
+inv db watch --email admin@example.com
+
+# Gmail SMTP (requires app password)
+inv db watch -e you@gmail.com --smtp-host smtp.gmail.com --smtp-port 587 --smtp-tls --smtp-user you@gmail.com --smtp-password "app-password"
+
+# Webhook notifications (Slack, Teams, custom)
+inv db watch --webhook https://hooks.slack.com/services/xxx/yyy/zzz
+```
+
 ## CLI Output Examples
 
 ### `inv db health` - All Healthy
@@ -74,6 +111,26 @@ Database Health Check
 Container:  inventory-db [running]
 Database:   connection refused
 Status:     UNHEALTHY - Database not accepting connections
+```
+
+### `inv db watch` - Continuous Monitoring
+```
+Database Health Monitor
+------------------------------
+Interval:     30s
+Email:        admin@example.com
+------------------------------
+Press Ctrl+C to stop
+
+[2024-11-28 14:30:00] OK - Healthy (latency: 12ms)
+[2024-11-28 14:30:30] OK - Healthy (latency: 15ms)
+[2024-11-28 14:31:00] DOWN - Container inventory-db is exited
+  State changed: DOWN
+  Sending email to admin@example.com... sent
+[2024-11-28 14:31:30] DOWN - Container inventory-db is exited
+[2024-11-28 14:32:00] OK - Healthy (latency: 18ms)
+  State changed: UP
+  Sending email to admin@example.com... sent
 ```
 
 ## Test Scenarios
@@ -109,10 +166,10 @@ Status:     UNHEALTHY - Database not accepting connections
 ## Out of Scope
 
 - External monitoring integration (Prometheus, etc.)
-- Alerting/notification systems
 - Automatic recovery
 
 ---
 
 **Created**: 2024-11-28
-**Status**: Ready for Implementation
+**Updated**: 2024-11-28 - Added watch command with email/webhook notifications
+**Status**: Implemented
