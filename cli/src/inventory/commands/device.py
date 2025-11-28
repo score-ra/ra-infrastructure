@@ -19,7 +19,10 @@ def list_devices(
     site: str = typer.Option(None, "--site", "-s", help="Filter by site slug"),
     zone: str = typer.Option(None, "--zone", "-z", help="Filter by zone slug"),
     category: str = typer.Option(None, "--category", "-c", help="Filter by category slug"),
-    status: str = typer.Option(None, "--status", help="Filter by status"),
+    status: str = typer.Option(None, "--status", help="Filter by operational status"),
+    usage_status: str = typer.Option(
+        None, "--usage-status", "-u", help="Filter by usage status: active, stored, failed, retired, pending"
+    ),
     limit: int = typer.Option(50, "--limit", "-l", help="Maximum number of results"),
 ):
     """List devices."""
@@ -28,7 +31,7 @@ def list_devices(
             query = """
                 SELECT
                     d.id, d.name, d.slug, d.device_type, d.status,
-                    d.manufacturer, d.model, d.ip_address,
+                    d.usage_status, d.manufacturer, d.model, d.ip_address,
                     s.name as site_name, s.slug as site_slug,
                     z.name as zone_name,
                     c.name as category_name
@@ -56,6 +59,10 @@ def list_devices(
                 query += " AND d.status = %s"
                 params.append(status)
 
+            if usage_status:
+                query += " AND d.usage_status = %s"
+                params.append(usage_status)
+
             query += " ORDER BY d.name LIMIT %s"
             params.append(limit)
 
@@ -71,8 +78,8 @@ def list_devices(
     table.add_column("Type")
     table.add_column("Zone")
     table.add_column("Status")
+    table.add_column("Usage")
     table.add_column("IP")
-    table.add_column("Manufacturer")
 
     for row in rows:
         status_color = {
@@ -82,13 +89,21 @@ def list_devices(
             "maintenance": "blue",
         }.get(row["status"], "white")
 
+        usage_color = {
+            "active": "green",
+            "stored": "cyan",
+            "failed": "red",
+            "retired": "dim",
+            "pending": "yellow",
+        }.get(row["usage_status"], "white")
+
         table.add_row(
             row["name"],
             row["device_type"],
             row["zone_name"] or "-",
             f"[{status_color}]{row['status']}[/{status_color}]",
+            f"[{usage_color}]{row['usage_status']}[/{usage_color}]",
             str(row["ip_address"]) if row["ip_address"] else "-",
-            row["manufacturer"] or "-",
         )
 
     console.print(table)
@@ -127,11 +142,25 @@ def show(slug: str = typer.Argument(..., help="Device slug")):
     console.print(f"  Type: {device['device_type']}")
     console.print(f"  Category: {device['category_name'] or 'Not set'}")
     console.print(f"  Status: {device['status']}")
+    console.print(f"  Usage: {device.get('usage_status', 'active')}")
 
     console.print("\n[bold]Location[/bold]")
     console.print(f"  Site: {device['site_name']}")
     console.print(f"  Zone: {device['zone_name'] or 'Not assigned'}")
     console.print(f"  Network: {device['network_name'] or 'Not assigned'}")
+
+    # Show usage-specific details
+    usage = device.get('usage_status', 'active')
+    if usage == 'stored' and device.get('storage_location'):
+        console.print(f"  Storage Location: {device['storage_location']}")
+    elif usage == 'failed':
+        console.print("\n[bold]Failure Info[/bold]")
+        if device.get('failure_date'):
+            console.print(f"  Failure Date: {device['failure_date']}")
+        if device.get('failure_reason'):
+            console.print(f"  Reason: {device['failure_reason']}")
+        if device.get('rma_reference'):
+            console.print(f"  RMA Reference: {device['rma_reference']}")
 
     if device["manufacturer"] or device["model"]:
         console.print("\n[bold]Hardware[/bold]")
@@ -248,10 +277,10 @@ def create(
 def count(
     site: str = typer.Option(None, "--site", "-s", help="Filter by site slug"),
     by: str = typer.Option(
-        "category", "--by", "-b", help="Group by: category, type, zone, status"
+        "category", "--by", "-b", help="Group by: category, type, zone, status, usage"
     ),
 ):
-    """Count devices by category, type, zone, or status."""
+    """Count devices by category, type, zone, status, or usage."""
     with get_connection() as conn:
         with conn.cursor() as cur:
             group_column = {
@@ -259,6 +288,7 @@ def count(
                 "type": "d.device_type",
                 "zone": "z.name",
                 "status": "d.status",
+                "usage": "d.usage_status",
             }.get(by, "c.name")
 
             query = f"""
@@ -410,3 +440,195 @@ def delete(
 
             conn.commit()
             console.print(f"[green][OK][/green] Deleted device: {slug}")
+
+
+# ============================================================================
+# Usage Status Commands
+# ============================================================================
+
+
+@app.command()
+def store(
+    slug: str = typer.Argument(..., help="Device slug"),
+    location: Optional[str] = typer.Option(None, "--location", "-l", help="Storage location"),
+):
+    """Mark a device as stored (in storage, not deployed)."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM devices WHERE slug = %s", (slug,))
+            if not cur.fetchone():
+                console.print(f"[red]Device not found:[/red] {slug}")
+                raise typer.Exit(1)
+
+            try:
+                cur.execute(
+                    """
+                    UPDATE devices
+                    SET usage_status = 'stored',
+                        storage_location = %s,
+                        status = 'offline'
+                    WHERE slug = %s
+                    RETURNING slug
+                    """,
+                    (location, slug),
+                )
+                conn.commit()
+                msg = f"[green][OK][/green] Device '{slug}' marked as stored"
+                if location:
+                    msg += f" at '{location}'"
+                console.print(msg)
+
+            except Exception as e:
+                conn.rollback()
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1)
+
+
+@app.command()
+def activate(
+    slug: str = typer.Argument(..., help="Device slug"),
+):
+    """Mark a device as active (deployed and in use)."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM devices WHERE slug = %s", (slug,))
+            if not cur.fetchone():
+                console.print(f"[red]Device not found:[/red] {slug}")
+                raise typer.Exit(1)
+
+            try:
+                cur.execute(
+                    """
+                    UPDATE devices
+                    SET usage_status = 'active',
+                        storage_location = NULL,
+                        failure_date = NULL,
+                        failure_reason = NULL,
+                        rma_reference = NULL
+                    WHERE slug = %s
+                    RETURNING slug
+                    """,
+                    (slug,),
+                )
+                conn.commit()
+                console.print(f"[green][OK][/green] Device '{slug}' marked as active")
+
+            except Exception as e:
+                conn.rollback()
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1)
+
+
+@app.command()
+def fail(
+    slug: str = typer.Argument(..., help="Device slug"),
+    reason: Optional[str] = typer.Option(None, "--reason", "-r", help="Failure reason"),
+    rma: Optional[str] = typer.Option(None, "--rma", help="RMA/warranty reference number"),
+):
+    """Mark a device as failed (hardware failure, out of service)."""
+    from datetime import date
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM devices WHERE slug = %s", (slug,))
+            if not cur.fetchone():
+                console.print(f"[red]Device not found:[/red] {slug}")
+                raise typer.Exit(1)
+
+            try:
+                cur.execute(
+                    """
+                    UPDATE devices
+                    SET usage_status = 'failed',
+                        status = 'offline',
+                        failure_date = %s,
+                        failure_reason = %s,
+                        rma_reference = %s
+                    WHERE slug = %s
+                    RETURNING slug
+                    """,
+                    (date.today(), reason, rma, slug),
+                )
+                conn.commit()
+                console.print(f"[green][OK][/green] Device '{slug}' marked as failed")
+                if reason:
+                    console.print(f"  Reason: {reason}")
+                if rma:
+                    console.print(f"  RMA: {rma}")
+
+            except Exception as e:
+                conn.rollback()
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1)
+
+
+@app.command()
+def retire(
+    slug: str = typer.Argument(..., help="Device slug"),
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Mark a device as retired (permanently out of service)."""
+    if not confirm:
+        confirm = typer.confirm(
+            f"Retire device '{slug}'? This marks it as permanently out of service."
+        )
+        if not confirm:
+            raise typer.Abort()
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM devices WHERE slug = %s", (slug,))
+            if not cur.fetchone():
+                console.print(f"[red]Device not found:[/red] {slug}")
+                raise typer.Exit(1)
+
+            try:
+                cur.execute(
+                    """
+                    UPDATE devices
+                    SET usage_status = 'retired',
+                        status = 'decommissioned'
+                    WHERE slug = %s
+                    RETURNING slug
+                    """,
+                    (slug,),
+                )
+                conn.commit()
+                console.print(f"[green][OK][/green] Device '{slug}' marked as retired")
+
+            except Exception as e:
+                conn.rollback()
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1)
+
+
+@app.command()
+def pending(
+    slug: str = typer.Argument(..., help="Device slug"),
+):
+    """Mark a device as pending (newly acquired, awaiting deployment)."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM devices WHERE slug = %s", (slug,))
+            if not cur.fetchone():
+                console.print(f"[red]Device not found:[/red] {slug}")
+                raise typer.Exit(1)
+
+            try:
+                cur.execute(
+                    """
+                    UPDATE devices
+                    SET usage_status = 'pending',
+                        status = 'unknown'
+                    WHERE slug = %s
+                    RETURNING slug
+                    """,
+                    (slug,),
+                )
+                conn.commit()
+                console.print(f"[green][OK][/green] Device '{slug}' marked as pending")
+
+            except Exception as e:
+                conn.rollback()
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1)

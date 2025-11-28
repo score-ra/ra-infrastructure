@@ -3,6 +3,7 @@ Device model.
 """
 
 import re
+from datetime import date
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 from inventory.models.base import BaseEntity, SlugMixin
 
 DeviceStatus = Literal["online", "offline", "unknown", "maintenance"]
+UsageStatus = Literal["active", "stored", "failed", "retired", "pending"]
 
 
 class DeviceBase(BaseModel):
@@ -19,6 +21,7 @@ class DeviceBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     device_type: str = Field(..., min_length=1, max_length=100)
     status: DeviceStatus = "unknown"
+    usage_status: UsageStatus = "active"
     manufacturer: Optional[str] = None
     model: Optional[str] = None
     serial_number: Optional[str] = None
@@ -27,6 +30,10 @@ class DeviceBase(BaseModel):
     mac_address: Optional[str] = None
     ip_address: Optional[str] = None
     is_active: bool = True
+    storage_location: Optional[str] = None
+    failure_date: Optional[date] = None
+    failure_reason: Optional[str] = None
+    rma_reference: Optional[str] = None
 
     @field_validator("mac_address")
     @classmethod
@@ -54,6 +61,7 @@ class DeviceUpdate(BaseModel):
 
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     status: Optional[DeviceStatus] = None
+    usage_status: Optional[UsageStatus] = None
     zone_id: Optional[UUID] = None
     manufacturer: Optional[str] = None
     model: Optional[str] = None
@@ -61,6 +69,10 @@ class DeviceUpdate(BaseModel):
     firmware_version: Optional[str] = None
     mac_address: Optional[str] = None
     ip_address: Optional[str] = None
+    storage_location: Optional[str] = None
+    failure_date: Optional[date] = None
+    failure_reason: Optional[str] = None
+    rma_reference: Optional[str] = None
 
     @field_validator("mac_address")
     @classmethod
