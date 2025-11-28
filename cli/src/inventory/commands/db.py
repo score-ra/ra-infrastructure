@@ -3,7 +3,7 @@ Database management commands.
 """
 
 import subprocess
-import sys
+import time
 from pathlib import Path
 
 import typer
@@ -15,6 +15,250 @@ from inventory.db.connection import get_connection
 
 app = typer.Typer(help="Database operations")
 console = Console()
+
+# Container configuration
+CONTAINER_NAME = "inventory-db"
+DOCKER_COMPOSE_DIR = "docker"
+
+
+def _get_container_status() -> dict:
+    """Get the status of the database container."""
+    try:
+        result = subprocess.run(
+            ["docker", "inspect", "--format", "{{.State.Status}}", CONTAINER_NAME],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            status = result.stdout.strip()
+            return {"exists": True, "status": status, "running": status == "running"}
+        return {"exists": False, "status": "not found", "running": False}
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return {"exists": False, "status": "docker unavailable", "running": False}
+
+
+def _test_db_connection() -> dict:
+    """Test database connection and measure latency."""
+    try:
+        start = time.time()
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
+        latency_ms = int((time.time() - start) * 1000)
+        return {"connected": True, "latency_ms": latency_ms, "error": None}
+    except Exception as e:
+        return {"connected": False, "latency_ms": None, "error": str(e)}
+
+
+def _get_compose_command() -> list:
+    """Get the docker compose command (supports both old and new syntax)."""
+    # Try new syntax first (docker compose)
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "version"],
+            capture_output=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return ["docker", "compose"]
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    # Fall back to old syntax (docker-compose)
+    return ["docker-compose"]
+
+
+@app.command()
+def health():
+    """Check database health status.
+
+    Returns exit code 0 if healthy, 1 if unhealthy.
+    Useful for scripting and monitoring.
+    """
+    console.print("[bold]Database Health Check[/bold]")
+    console.print("-" * 25)
+
+    # Check container
+    container = _get_container_status()
+    container_status = container["status"]
+    container_style = "green" if container["running"] else "red"
+    console.print(f"Container:  {CONTAINER_NAME} [[{container_style}]{container_status}[/{container_style}]]")
+
+    # Check database connection
+    if container["running"]:
+        db = _test_db_connection()
+        if db["connected"]:
+            console.print(f"Database:   [green]connected[/green] (latency: {db['latency_ms']}ms)")
+            console.print("Status:     [green]HEALTHY[/green]")
+            raise typer.Exit(0)
+        else:
+            console.print(f"Database:   [red]connection failed[/red]")
+            console.print(f"            {db['error']}")
+            console.print("Status:     [red]UNHEALTHY[/red] - Database not accepting connections")
+            raise typer.Exit(1)
+    else:
+        console.print("Database:   [dim]N/A[/dim]")
+        console.print("Status:     [red]UNHEALTHY[/red] - Container not running")
+        raise typer.Exit(1)
+
+
+@app.command()
+def status():
+    """Show detailed database status."""
+    settings = get_settings()
+
+    console.print("[bold]Database Status[/bold]")
+    console.print("-" * 30)
+
+    # Container info
+    container = _get_container_status()
+
+    table = Table(show_header=False, box=None)
+    table.add_column("Property", style="cyan")
+    table.add_column("Value")
+
+    table.add_row("Container", CONTAINER_NAME)
+    status_style = "green" if container["running"] else "red"
+    table.add_row("State", f"[{status_style}]{container['status']}[/{status_style}]")
+
+    # Get more details if container exists
+    if container["exists"]:
+        try:
+            # Get uptime
+            result = subprocess.run(
+                ["docker", "inspect", "--format", "{{.State.StartedAt}}", CONTAINER_NAME],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                table.add_row("Started", result.stdout.strip()[:19])
+
+            # Get ports
+            result = subprocess.run(
+                ["docker", "port", CONTAINER_NAME],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                table.add_row("Ports", result.stdout.strip().replace("\n", ", "))
+        except subprocess.TimeoutExpired:
+            pass
+
+    # Database connection
+    if container["running"]:
+        db = _test_db_connection()
+        if db["connected"]:
+            table.add_row("Connection", f"[green]OK[/green] ({db['latency_ms']}ms)")
+        else:
+            table.add_row("Connection", f"[red]Failed[/red]")
+    else:
+        table.add_row("Connection", "[dim]N/A[/dim]")
+
+    table.add_row("Host", f"{settings.db_host}:{settings.db_port}")
+    table.add_row("Database", settings.db_name)
+    table.add_row("User", settings.db_user)
+
+    console.print(table)
+
+
+@app.command()
+def stop(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Stop the database container."""
+    if not yes:
+        confirm = typer.confirm(f"Stop container '{CONTAINER_NAME}'?")
+        if not confirm:
+            raise typer.Abort()
+
+    console.print(f"Stopping {CONTAINER_NAME}...", end=" ")
+
+    try:
+        result = subprocess.run(
+            ["docker", "stop", CONTAINER_NAME],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            console.print("[green]stopped[/green]")
+        else:
+            console.print(f"[red]failed[/red]")
+            console.print(result.stderr)
+            raise typer.Exit(1)
+    except subprocess.TimeoutExpired:
+        console.print("[red]timeout[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def start():
+    """Start the database container."""
+    console.print(f"Starting {CONTAINER_NAME}...", end=" ")
+
+    try:
+        result = subprocess.run(
+            ["docker", "start", CONTAINER_NAME],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            console.print("[green]started[/green]")
+
+            # Wait for database to be ready
+            console.print("Waiting for database...", end=" ")
+            for _ in range(10):
+                time.sleep(1)
+                db = _test_db_connection()
+                if db["connected"]:
+                    console.print("[green]ready[/green]")
+                    return
+            console.print("[yellow]timeout waiting for connection[/yellow]")
+        else:
+            console.print(f"[red]failed[/red]")
+            console.print(result.stderr)
+            raise typer.Exit(1)
+    except subprocess.TimeoutExpired:
+        console.print("[red]timeout[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def restart():
+    """Restart the database container."""
+    console.print(f"Restarting {CONTAINER_NAME}...", end=" ")
+
+    try:
+        result = subprocess.run(
+            ["docker", "restart", CONTAINER_NAME],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode == 0:
+            console.print("[green]restarted[/green]")
+
+            # Wait for database to be ready
+            console.print("Waiting for database...", end=" ")
+            for _ in range(10):
+                time.sleep(1)
+                db = _test_db_connection()
+                if db["connected"]:
+                    console.print("[green]ready[/green]")
+                    return
+            console.print("[yellow]timeout waiting for connection[/yellow]")
+        else:
+            console.print(f"[red]failed[/red]")
+            console.print(result.stderr)
+            raise typer.Exit(1)
+    except subprocess.TimeoutExpired:
+        console.print("[red]timeout[/red]")
+        raise typer.Exit(1)
 
 
 @app.command()
