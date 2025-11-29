@@ -1,181 +1,158 @@
-# RA Infrastructure
+# ra-infrastructure
 
-Personal infrastructure tools and scripts for development environment management, documentation workflows, and external application administration.
+Central infrastructure repository for device inventory, network management, and multi-site organization support.
 
 ## Overview
 
-This repository contains personal tools, scripts, and documentation that support development workflows but are not specific to any particular project infrastructure. These tools were extracted from the sc-infrastructure repository during a hardening sprint to maintain clear separation of concerns.
+This repository provides:
+- **Device Inventory Database** - PostgreSQL-based tracking of all devices across sites
+- **Multi-Organization Support** - Manage residential, office, and lab environments
+- **Network Awareness** - Track networks (WiFi, Ethernet, Z-Wave, Zigbee, Bluetooth)
+- **CLI Tools** - Python-based command-line interface for management
+- **Auto-Generated Schema Diagrams** - ER diagrams generated directly from live database
+- **REST API** - Node.js API for integrations (future)
 
-## Repository Scope
+## Architecture
 
-This repository includes:
-- Personal development environment setup and configuration tools
-- Documentation workflow automation (Obsidian, knowledge management)
-- Windows system administration scripts
-- External application management (WordPress, file transfers)
-- General-purpose utility scripts and guides
+```
+Organization (e.g., "Anand Family", "Company")
+└── Site (e.g., "Primary Residence", "Office")
+    └── Zone (e.g., "Living Room", "Server Closet")
+        └── Device (switches, cameras, sensors, etc.)
+```
+
+## Quick Start
+
+### Prerequisites
+- Docker & Docker Compose
+- Python 3.11+
+- Node.js 18+ (for API, future)
+
+### Setup
+
+```bash
+# Start PostgreSQL and pgAdmin
+cd docker
+docker-compose up -d
+
+# Install CLI
+cd cli
+pip install -e .
+
+# Initialize database
+inv db migrate
+inv db seed
+
+# Verify
+inv org list
+```
 
 ## Repository Structure
 
 ```
 ra-infrastructure/
-├── docs/                      # Personal guides and documentation
-│   └── guides/                # How-to guides
-│       ├── OBSIDIAN-VAULT-SETUP-GUIDE.md
-│       ├── windows-powershell-remoting-setup.md
-│       └── winscp-setup.md
-├── scripts/                   # Personal automation scripts
-│   ├── setup/                 # Environment setup scripts
-│   │   ├── New-WindowsUserEnvironment.ps1
-│   │   ├── Update-DownloadsFolder.ps1
-│   │   └── setup-obsidian-vault.sh
-│   └── file-transfer/         # File transfer and backup scripts
-│       ├── wordpress-backup.ps1
-│       └── wordpress-backup-simple.ps1
-└── services/                  # External service configurations
-    └── wordpress/             # WordPress management
+├── docker/
+│   └── docker-compose.yml      # PostgreSQL + pgAdmin
+├── database/
+│   ├── migrations/             # SQL migration files (versioned)
+│   ├── seeds/                  # Initial/sample data
+│   └── schema.sql              # Full schema reference
+├── cli/                        # Python CLI (inv command)
+│   ├── pyproject.toml
+│   └── src/inventory/
+│       ├── commands/           # CLI command groups
+│       ├── db/                 # Database access
+│       └── models/             # Data models
+├── api/                        # REST API (future)
+│   └── node/
+└── docs/
+    └── schema.md               # Database documentation
 ```
 
-## Contents
-
-### Documentation Guides
-
-#### Obsidian Vault Setup Guide
-- **File:** `docs/guides/OBSIDIAN-VAULT-SETUP-GUIDE.md`
-- **Purpose:** Comprehensive guide for creating new Obsidian vaults with pre-configured plugins
-- **Use Cases:** Documentation workflows, knowledge management, technical writing
-
-#### Windows PowerShell Remoting Setup
-- **File:** `docs/guides/windows-powershell-remoting-setup.md`
-- **Purpose:** Guide for enabling PowerShell remoting on Windows computers
-- **Use Cases:** Remote Windows administration, system management
-
-#### WinSCP Setup and Integration
-- **File:** `docs/guides/winscp-setup.md`
-- **Purpose:** Complete setup guide for WinSCP file transfers and remote server management
-- **Use Cases:** SFTP/FTP file transfers, remote deployments, backups
-
-### Setup Scripts
-
-#### Windows User Environment Setup
-- **File:** `scripts/setup/New-WindowsUserEnvironment.ps1`
-- **Purpose:** Automated Windows 11 user account setup with development tools
-- **Features:**
-  - User account creation with appropriate permissions
-  - Development tool installation (Git, VS Code, Docker, Node.js, Python, etc.)
-  - Environment variable configuration
-  - Git and SSH setup
-  - Shell environment customization
-- **Profiles:** Developer, Admin, Standard
-
-#### Downloads Folder Configuration
-- **File:** `scripts/setup/Update-DownloadsFolder.ps1`
-- **Purpose:** Updates Windows Shell Folders registry to set Downloads folder location
-- **Use Case:** Fix OneDrive-redirected Downloads folder to default Windows location
-
-#### Obsidian Vault Automation
-- **File:** `scripts/setup/setup-obsidian-vault.sh`
-- **Purpose:** Automates creation of Obsidian vaults with Excalidraw and Heading Shifter plugins
-- **Use Cases:** Rapid vault setup, standardized documentation environments
-
-### File Transfer Scripts
-
-#### WordPress Site Backup
-- **File:** `scripts/file-transfer/wordpress-backup.ps1`
-- **Purpose:** Downloads WordPress sites from hosting (GoHighLevel/Rocket/FTP)
-- **Backup Types:** Full site, wp-content, config, uploads
-- **Features:** Compression, incremental backups, transfer statistics
-
-#### WordPress Simple Backup
-- **File:** `scripts/file-transfer/wordpress-backup-simple.ps1`
-- **Purpose:** Simplified version of WordPress backup script
-- **Use Case:** Quick backups without complex configuration
-
-## Usage Examples
-
-### Setting Up a New Windows User Environment
-
-```powershell
-# Developer profile with full toolset
-.\scripts\setup\New-WindowsUserEnvironment.ps1 -NewUsername "rohit" -UserFullName "Rohit Anand" -SetupProfile "Developer"
-
-# Dry run to see what would be installed
-.\scripts\setup\New-WindowsUserEnvironment.ps1 -NewUsername "testuser" -SetupProfile "Developer" -DryRun
-```
-
-### Creating a New Obsidian Vault
+## CLI Commands (MVP)
 
 ```bash
-# Create vault with pre-configured plugins
-./scripts/setup/setup-obsidian-vault.sh /c/Users/Rohit/workspace/new-documentation-vault
+# Organizations
+inv org list
+inv org create "Anand Family" --type home
+inv org show anand-family
+
+# Sites
+inv site list --org anand-family
+inv site create "Primary Residence" --org anand-family --address "..."
+inv site show primary-residence
+
+# Devices
+inv device list --site primary-residence
+inv device create "Living Room Switch" --type switch --zone living-room
+inv device import homeseer --file devices.json
+inv device show living-room-switch
+
+# Networks
+inv network list --site primary-residence
+inv network create "Main WiFi" --type wifi --ssid "HomeNet"
+inv network scan --site primary-residence
+
+# Reports
+inv report devices --format csv > devices.csv
+inv report topology --site primary-residence
+
+# Database schema diagram
+inv db schema                      # Generate PNG diagram
+inv db schema -f html              # Generate full HTML documentation
 ```
 
-### Backing Up WordPress Site
+## Schema Diagram
 
-```powershell
-# Full site backup with compression
-.\scripts\file-transfer\wordpress-backup.ps1 -BackupType full -Compress
+Generate an up-to-date ER diagram directly from the live database:
 
-# Backup only uploads directory
-.\scripts\file-transfer\wordpress-backup.ps1 -BackupType uploads -LocalPath ".\backups"
+```bash
+# Generate PNG diagram (requires Docker)
+inv db schema
+
+# Output: docs/schema.png
 ```
 
-### Enabling PowerShell Remoting
+This ensures the diagram always matches the actual database schema - no manual maintenance required. The command uses [SchemaSpy](https://schemaspy.org/) via Docker to introspect the database and generate the diagram.
 
-```powershell
-# On target computer (run as Administrator)
-Enable-PSRemoting -Force
-Set-Item WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
+For full interactive documentation with all tables, columns, and relationships:
 
-# On client computer
-Enter-PSSession -ComputerName TARGET-PC -Credential (Get-Credential)
+```bash
+inv db schema -f html
+# Open docs/schema/index.html in a browser
 ```
 
-## Origin and History
+## Database Access
 
-These tools were extracted from the `sc-infrastructure` repository on 2025-10-11 during a repository hardening sprint. The goal was to maintain clear separation between:
-- Project-specific infrastructure (Symphony Core) → `sc-infrastructure`
-- Personal tools and general utilities → `ra-infrastructure` (this repository)
+- **PostgreSQL**: `localhost:5432`
+  - Database: `inventory`
+  - User: `inventory`
+  - Password: (see `.env`)
 
-For the complete analysis and rationale, see the hardening sprint report in the sc-infrastructure repository.
+- **pgAdmin**: `http://localhost:5050`
+  - Email: `admin@local.dev`
+  - Password: (see `.env`)
 
-## Compatibility
+## Integration with Other Repos
 
-### Operating Systems
-- **Windows:** Primary target (Windows 10/11 Pro)
-- **Linux/macOS:** Some scripts (bash scripts) are cross-platform
+This repo provides the central database that other repos connect to:
 
-### Requirements
-- PowerShell 5.1+ (Windows scripts)
-- Git Bash or compatible shell (bash scripts)
-- WinSCP (file transfer scripts)
-- Obsidian (vault setup scripts)
-
-## Contributing
-
-This is a personal repository, but contributions and suggestions are welcome. When adding new tools:
-
-1. Ensure they are general-purpose utilities, not project-specific
-2. Include comprehensive documentation
-3. Follow existing script conventions and error handling
-4. Test across relevant platforms/environments
+| Repo | Integration |
+|------|-------------|
+| `ra-home-automation` | Syncs HomeSeer devices to inventory |
+| `ra-network` | Network discovery populates devices |
+| Future repos | Connect via CLI or API |
 
 ## Related Repositories
 
-- **sc-infrastructure:** Symphony Core project infrastructure management
-- **ObsidianVault:** Personal knowledge management vault (if separate repo)
+- [ra-home-automation](../ra-home-automation) - HomeSeer, BlueIris automation
+- [ra-network](../ra-network) - Network management (future)
 
 ## License
 
-Personal use. Individual scripts may have specific licensing depending on their origin.
-
-## Maintenance
-
-**Created:** 2025-10-11
-**Owner:** Rohit Anand
-**Purpose:** Personal development tools and general-purpose utilities
-**Status:** Active
+Private - Internal use only
 
 ---
 
-**Note:** This repository intentionally excludes project-specific infrastructure code to maintain clear boundaries and improve maintainability.
+**Created**: 2025-11-25
+**Status**: Foundation phase

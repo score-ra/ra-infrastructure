@@ -1,57 +1,91 @@
-# Documentation project .gitignore (Obsidian-enabled)
-
-# Editor files
-.vscode/
-.idea/
-*.swp
-*~
-
-# OS files
-.DS_Store
-Thumbs.db
-Desktop.ini
-
-# Obsidian workspace files (personal preferences)
-.obsidian/workspace.json
-.obsidian/workspace-mobile.json
-
-# Keep Obsidian plugin configurations (shared settings)
-!.obsidian/app.json
-!.obsidian/appearance.json
-!.obsidian/community-plugins.json
-!.obsidian/core-plugins.json
-!.obsidian/plugins/
-
-# Build outputs
-_site/
-.jekyll-cache/
-.sass-cache/
-
-# Temporary files
-*.tmp
-*.bak
-*~
-*.autosave
-
 # Environment files
 .env
 .env.local
+.env.*.local
 
-# Video files (large binary assets - configure as needed)
-# Uncomment to exclude all videos from version control
-/*.mp4
-/*.mov
-/*.avi
-/*.webm
-/*.png
-/*.jpg
-/*.jpeg
-/*.gif
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
 
-# Or exclude specific video files
-# videos/large-file.mp4
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
 
-# Large binary assets (if needed)
-# *.psd
-# *.ai
-ra-infrastructure.code-workspace
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker/data/
+*.log
+
+# Database
+*.dump
+*.sql.gz
+
+# Secrets
+*.pem
+*.key
+secrets/
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs directory
+logs/
+
+# Monitoring config (contains credentials)
+config/monitoring.env
+config/rclone.conf
+
+# Claude Code local settings (entire folder)
+.claude/
+
+# Windows artifacts
+nul
+
+# SchemaSpy auto-generated files (regenerate with: inv db schema -f html)
+docs/bower/
+docs/fonts/
+docs/images/
+docs/routines/
+docs/tables/
+docs/schema/
+docs/*.html
+docs/*.js
+docs/*.css
+docs/*.xml
+docs/*.txt
+docs/diagrams/
+docs/*.png
