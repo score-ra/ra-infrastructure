@@ -1,0 +1,2 @@
+id,organization_id,org_name,name,slug,site_type,address_line1,address_line2,city,state,postal_code,country,latitude,longitude,timezone,is_primary,is_active,metadata,created_at,updated_at
+b0000000-0000-0000-0000-000000000001,a0000000-0000-0000-0000-000000000001,ra-personal,31-Newtown,31-newtown,residence,,,,,,USA,,,America/Los_Angeles,t,t,"{""blueiris_url"": ""http://192.168.68.56:81"", ""homeseer_url"": ""http://192.168.68.56""}",2025-11-27 02:12:40.846695+00,2025-11-27 12:57:15.918377+00

@@ -1,0 +1,2 @@
+id,network_id,network_name,device_id,device_name,ip_address,allocation_type,hostname,dns_names,mac_address,lease_start,lease_end,is_active,last_seen,notes,metadata,created_at,updated_at
+e0f858bf-a575-4cbe-a609-24eb7e3c5de4,d0000000-0000-0000-0000-000000000001,Main LAN,e0000000-0000-0000-0000-000000000001,HomeSeer Server,192.168.68.56,static,homeseer,,,,,t,,,{},2025-11-27 02:12:40.846695+00,2025-11-27 02:12:40.846695+00
