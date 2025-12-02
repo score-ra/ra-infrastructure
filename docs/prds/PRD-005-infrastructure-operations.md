@@ -6,8 +6,9 @@
 |-------|-------|
 | **PRD Number** | PRD-005 |
 | **Title** | Infrastructure Operations - Monitoring, Auto-Start, Backup & DR |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2025-11-27 |
+| **Implemented** | 2025-12-02 |
 | **Author** | Infrastructure Team |
 
 ## Problem Statement
@@ -420,3 +421,88 @@ ALERT_RATE_LIMIT_MINUTES=15
   </Actions>
 </Task>
 ```
+
+---
+
+## Appendix B: Backup and DR Best Practices
+
+*Requirements summary for ra-infrastructure personal organization*
+
+### Core Principles
+
+1. **Data must survive any single point of failure**
+   - Local disk failure should not cause data loss
+   - Remote backup ensures geographic redundancy
+
+2. **Recovery must be achievable by a novice user**
+   - Documentation assumes no prior technical knowledge
+   - Step-by-step instructions with expected outputs
+   - Troubleshooting guidance for common errors
+
+3. **Automation over manual processes**
+   - Scheduled backups run without human intervention
+   - Health monitoring detects failures automatically
+   - Email alerts notify on problems
+
+### Backup Strategy
+
+| Requirement | Implementation |
+|-------------|----------------|
+| **Daily local backups** | Compressed database dumps stored on local drive |
+| **Weekly remote backups** | Upload to Google Drive Shared Drive |
+| **30-day local retention** | Automatic cleanup of old daily backups (~1 month) |
+| **26-week remote retention** | Automatic cleanup of old weekly backups (6 months) |
+| **Backup verification** | Integrity check after each backup |
+| **Failure alerting** | Email notification on backup failure |
+
+### Disaster Recovery Requirements
+
+| Metric | Target |
+|--------|--------|
+| **Recovery Time Objective (RTO)** | 1 hour maximum |
+| **Recovery Point Objective (RPO)** | 24 hours (last daily backup) |
+| **DR Testing Frequency** | Quarterly |
+
+### Recovery Scenarios Covered
+
+| Scenario | Recovery Method | Target Time |
+|----------|-----------------|-------------|
+| Container stopped | Restart container | 2 minutes |
+| Docker crashed | Restart Docker Desktop | 5 minutes |
+| Database corrupted | Restore from backup | 30 minutes |
+| Volume deleted | Restore from backup | 30 minutes |
+| Disk failure | Full recovery from remote backup | 1 hour |
+| PC failure | New machine setup + restore | 1 hour |
+
+### Documentation Requirements
+
+| Requirement | Purpose |
+|-------------|---------|
+| **Novice-friendly language** | User may not know technical terms |
+| **Download links for all tools** | User shouldn't have to search |
+| **Expected output after commands** | User knows if step succeeded |
+| **Troubleshooting section** | User can self-resolve common issues |
+| **Glossary of terms** | User can look up unfamiliar concepts |
+| **Manual + automated options** | Flexibility for different situations |
+
+### Infrastructure Components
+
+| Component | Purpose | Storage Location |
+|-----------|---------|------------------|
+| Database dumps | Primary data backup | `D:\Backups\ra-infrastructure\daily\` |
+| Remote backups | Geographic redundancy | Google Drive: `ra-infrastructure-backup` |
+| Backup scripts | Automation | `scripts/backup.ps1`, `restore.ps1` |
+| Health monitoring | Failure detection | `scripts/health-check.ps1` |
+| DR Runbook | Recovery procedures | `docs/DR-RUNBOOK.md` |
+| Task Scheduler | Automated execution | Windows Task Scheduler |
+
+### What Gets Backed Up
+
+| Data | Included | Method |
+|------|----------|--------|
+| PostgreSQL database | Yes | `pg_dump` to compressed file |
+| Database schema | Yes | Included in pg_dump |
+| Docker container config | Yes | In Git repository |
+| Application code | Yes | In Git repository |
+| Docker images | No | Re-downloaded from Docker Hub |
+| pgAdmin settings | No | Reconfigurable, not critical |

@@ -6,8 +6,8 @@
 
 | Field | Value |
 |-------|-------|
-| **Phase** | Foundation Complete |
-| **Last Updated** | 2025-11-27 |
+| **Phase** | Operations Ready |
+| **Last Updated** | 2025-12-02 |
 | **Purpose** | Central infrastructure database for other repositories |
 
 ## What This Repository Is
@@ -30,6 +30,13 @@ This database is designed to be consumed by **other repositories** for their dev
 - [x] Repository pattern for db layer
 - [x] Pydantic models for validation
 - [x] 79 tests passing
+- [x] **Backup & DR infrastructure** (PRD-005)
+  - Daily local backups (2:00 AM) with 30-day retention
+  - Weekly remote backups (Sunday 3:00 AM) to Google Drive with 6-month retention
+  - Health monitoring every 5 minutes with email alerts
+  - Disaster recovery runbook with 4-tier procedures
+  - Restore script with safety backups
+  - **Pending**: End-to-end DR test on separate device
 
 ## For External Repositories
 
@@ -45,8 +52,10 @@ See **[docs/DATABASE.md](docs/DATABASE.md)** for:
 |-----------|--------|
 | PostgreSQL | `localhost:5432` |
 | pgAdmin | `localhost:5050` |
-| Database | `ra_inventory` |
+| Database | `inventory` |
 | User | `inventory` |
+| Backups | `D:\Backups\ra-infrastructure\daily\` |
+| Remote Backups | Google Drive: `ra-infrastructure-backup` |
 
 ## Quick Commands
 
@@ -69,7 +78,9 @@ cd cli && pytest
 | Document | Purpose |
 |----------|---------|
 | [docs/DATABASE.md](docs/DATABASE.md) | **External repository integration guide** |
-| [docs/architecture/SPRINT-BACKLOG.md](docs/architecture/SPRINT-BACKLOG.md) | Completed task tracking |
+| [docs/DR-RUNBOOK.md](docs/DR-RUNBOOK.md) | **Disaster recovery procedures** |
+| [docs/RECOVERY-QUICKSTART.md](docs/RECOVERY-QUICKSTART.md) | One-page recovery reference |
+| [docs/prds/PRD-005-infrastructure-operations.md](docs/prds/PRD-005-infrastructure-operations.md) | Backup/DR requirements |
 | [CLAUDE.md](CLAUDE.md) | Development instructions |
 
 ## Notes

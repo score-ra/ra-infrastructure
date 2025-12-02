@@ -53,13 +53,50 @@ $script:DbContainer = "inventory-db"
 $script:DbName = "inventory"
 $script:DbUser = "inventory"
 
-# Retention settings
-$script:DailyRetentionDays = 7
-$script:WeeklyRetentionWeeks = 4
+# Retention settings (6 months)
+$script:DailyRetentionDays = 30      # ~1 month of daily backups locally
+$script:WeeklyRetentionWeeks = 26    # 6 months of weekly backups on Google Drive
 
 # rclone settings
 $script:RcloneRemote = "gdrive"
 $script:RcloneRemotePath = "ra-infrastructure-backup"
+
+# Find rclone in common locations and add to PATH if needed
+function Find-Rclone {
+    # Check if already in PATH
+    $rclone = Get-Command rclone -ErrorAction SilentlyContinue
+    if ($rclone) {
+        return $rclone.Source
+    }
+
+    # Common installation locations
+    $locations = @(
+        # Winget installation
+        (Get-ChildItem "C:\Users\$env:USERNAME\AppData\Local\Microsoft\WinGet\Packages\Rclone*" -ErrorAction SilentlyContinue |
+            Get-ChildItem -Filter "rclone.exe" -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName),
+        # Scoop
+        "C:\Users\$env:USERNAME\scoop\apps\rclone\current\rclone.exe",
+        # Chocolatey
+        "C:\ProgramData\chocolatey\bin\rclone.exe",
+        # Manual install
+        "C:\rclone\rclone.exe"
+    )
+
+    foreach ($loc in $locations) {
+        if ($loc -and (Test-Path $loc -ErrorAction SilentlyContinue)) {
+            # Add directory to PATH for this session
+            $dir = Split-Path $loc -Parent
+            $env:PATH = "$dir;$env:PATH"
+            return $loc
+        }
+    }
+
+    return $null
+}
+
+# Initialize rclone path
+$script:RclonePath = Find-Rclone
 
 # Ensure directories exist
 if (-not (Test-Path $script:LogDir)) {
@@ -304,6 +341,7 @@ function Test-BackupIntegrity {
     Write-Log "Verifying backup integrity..." -Level INFO
 
     $tempDb = "verify_backup_temp"
+    $tempDump = $null
 
     try {
         # Decompress to temp file
@@ -319,37 +357,37 @@ function Test-BackupIntegrity {
         $gzipStream.Close()
         $inputStream.Close()
 
-        # Create temp database
-        docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c "DROP DATABASE IF EXISTS $tempDb" 2>&1 | Out-Null
-        docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c "CREATE DATABASE $tempDb" 2>&1 | Out-Null
+        # Create temp database (suppress NOTICE messages from PostgreSQL by using cmd /c)
+        # PostgreSQL NOTICE messages go to stderr and trigger PowerShell errors
+        cmd /c "docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c `"DROP DATABASE IF EXISTS $tempDb`" 2>nul"
+        cmd /c "docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c `"CREATE DATABASE $tempDb`" 2>nul"
 
         # Restore to temp database
         Get-Content $tempDump -Raw | docker exec -i $script:DbContainer pg_restore -U $script:DbUser -d $tempDb 2>&1 | Out-Null
 
         # Verify by running a query
-        $result = docker exec $script:DbContainer psql -U $script:DbUser -d $tempDb -c "SELECT COUNT(*) FROM organizations" 2>&1
+        $null = docker exec $script:DbContainer psql -U $script:DbUser -d $tempDb -t -c "SELECT COUNT(*) FROM organizations" 2>&1
+        $exitCode = $LASTEXITCODE
 
-        if ($LASTEXITCODE -eq 0) {
+        # Cleanup before returning
+        cmd /c "docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c `"DROP DATABASE IF EXISTS $tempDb`" 2>nul"
+        if ($tempDump -and (Test-Path $tempDump)) { Remove-Item $tempDump -Force }
+
+        if ($exitCode -eq 0) {
             Write-Log "Backup verification passed" -Level SUCCESS
-            $verified = $true
+            return $true
         }
         else {
             Write-Log "Backup verification failed - could not query restored data" -Level ERROR
-            $verified = $false
+            return $false
         }
-
-        # Cleanup
-        docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c "DROP DATABASE IF EXISTS $tempDb" 2>&1 | Out-Null
-        Remove-Item $tempDump -Force
-
-        return $verified
     }
     catch {
         Write-Log "Verification failed: $_" -Level ERROR
 
         # Cleanup on error
-        docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c "DROP DATABASE IF EXISTS $tempDb" 2>&1 | Out-Null
-        if (Test-Path $tempDump) { Remove-Item $tempDump -Force }
+        cmd /c "docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c `"DROP DATABASE IF EXISTS $tempDb`" 2>nul"
+        if ($tempDump -and (Test-Path $tempDump)) { Remove-Item $tempDump -Force }
 
         return $false
     }
