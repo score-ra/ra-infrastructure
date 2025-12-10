@@ -266,10 +266,10 @@ function Test-Prerequisites {
 
 function New-DatabaseBackup {
     $date = Get-Date -Format "yyyy-MM-dd"
-    $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
     $dailyDir = Join-Path $BackupDir "daily"
-    $backupFile = Join-Path $dailyDir "${script:DbName}_${date}.dump"
-    $compressedFile = "${backupFile}.gz"
+    $compressedFile = Join-Path $dailyDir "${script:DbName}_${date}.dump.gz"
+    $containerDumpPath = "/tmp/backup_${date}.dump"
+    $containerGzPath = "${containerDumpPath}.gz"
 
     Write-Log "Creating database backup..." -Level INFO
     Write-Log "Output: $compressedFile" -Level INFO
@@ -278,39 +278,42 @@ function New-DatabaseBackup {
         # Create pg_dump
         $startTime = Get-Date
 
-        # Use pg_dump with custom format
-        docker exec $script:DbContainer pg_dump -U $script:DbUser -Fc $script:DbName > $backupFile
+        # Create dump inside container (avoids PowerShell binary corruption from redirection)
+        docker exec $script:DbContainer pg_dump -U $script:DbUser -Fc $script:DbName -f $containerDumpPath 2>&1 | Out-Null
 
         if ($LASTEXITCODE -ne 0) {
             Write-Log "pg_dump failed" -Level ERROR
             return $null
         }
 
-        # Check file was created and has content
-        if (-not (Test-Path $backupFile) -or (Get-Item $backupFile).Length -eq 0) {
-            Write-Log "Backup file is empty or not created" -Level ERROR
+        # Check file was created
+        $dumpSize = docker exec $script:DbContainer stat -c%s $containerDumpPath 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Backup file not created in container" -Level ERROR
             return $null
         }
 
-        $dumpSize = (Get-Item $backupFile).Length
-        Write-Log "Dump created: $([math]::Round($dumpSize / 1MB, 2)) MB" -Level INFO
+        Write-Log "Dump created: $([math]::Round([int64]$dumpSize / 1MB, 2)) MB" -Level INFO
 
-        # Compress with PowerShell (gzip alternative)
+        # Compress inside container
         Write-Log "Compressing backup..." -Level INFO
+        docker exec $script:DbContainer gzip -f $containerDumpPath 2>&1 | Out-Null
 
-        # Use .NET compression
-        $inputStream = [System.IO.File]::OpenRead($backupFile)
-        $outputStream = [System.IO.File]::Create($compressedFile)
-        $gzipStream = New-Object System.IO.Compression.GZipStream($outputStream, [System.IO.Compression.CompressionMode]::Compress)
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Compression failed" -Level ERROR
+            return $null
+        }
 
-        $inputStream.CopyTo($gzipStream)
+        # Copy compressed file from container to host
+        docker cp "${script:DbContainer}:${containerGzPath}" $compressedFile 2>&1 | Out-Null
 
-        $gzipStream.Close()
-        $outputStream.Close()
-        $inputStream.Close()
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Failed to copy backup from container" -Level ERROR
+            return $null
+        }
 
-        # Remove uncompressed file
-        Remove-Item $backupFile -Force
+        # Cleanup container files
+        docker exec $script:DbContainer rm -f $containerGzPath 2>&1 | Out-Null
 
         $compressedSize = (Get-Item $compressedFile).Length
         $duration = ((Get-Date) - $startTime).TotalSeconds
@@ -323,8 +326,8 @@ function New-DatabaseBackup {
     catch {
         Write-Log "Backup failed: $_" -Level ERROR
 
-        # Cleanup partial files
-        if (Test-Path $backupFile) { Remove-Item $backupFile -Force }
+        # Cleanup container files
+        docker exec $script:DbContainer rm -f $containerDumpPath $containerGzPath 2>&1 | Out-Null
         if (Test-Path $compressedFile) { Remove-Item $compressedFile -Force }
 
         return $null
@@ -341,29 +344,31 @@ function Test-BackupIntegrity {
     Write-Log "Verifying backup integrity..." -Level INFO
 
     $tempDb = "verify_backup_temp"
-    $tempDump = $null
+    $containerGzPath = "/tmp/verify_backup.dump.gz"
+    $containerDumpPath = "/tmp/verify_backup.dump"
 
     try {
-        # Decompress to temp file
-        $tempDump = [System.IO.Path]::GetTempFileName()
+        # Copy compressed backup file directly to container (avoids PowerShell binary handling issues)
+        docker cp $BackupFile "${script:DbContainer}:${containerGzPath}" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Failed to copy backup file to container" -Level ERROR
+            return $false
+        }
 
-        $inputStream = [System.IO.File]::OpenRead($BackupFile)
-        $outputStream = [System.IO.File]::Create($tempDump)
-        $gzipStream = New-Object System.IO.Compression.GZipStream($inputStream, [System.IO.Compression.CompressionMode]::Decompress)
-
-        $gzipStream.CopyTo($outputStream)
-
-        $outputStream.Close()
-        $gzipStream.Close()
-        $inputStream.Close()
+        # Decompress inside the container using gzip
+        docker exec $script:DbContainer gzip -d -k $containerGzPath 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Failed to decompress backup file in container" -Level ERROR
+            return $false
+        }
 
         # Create temp database (suppress NOTICE messages from PostgreSQL by using cmd /c)
         # PostgreSQL NOTICE messages go to stderr and trigger PowerShell errors
         cmd /c "docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c `"DROP DATABASE IF EXISTS $tempDb`" 2>nul"
         cmd /c "docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c `"CREATE DATABASE $tempDb`" 2>nul"
 
-        # Restore to temp database
-        Get-Content $tempDump -Raw | docker exec -i $script:DbContainer pg_restore -U $script:DbUser -d $tempDb 2>&1 | Out-Null
+        # Restore to temp database from file inside container
+        docker exec $script:DbContainer pg_restore -U $script:DbUser -d $tempDb $containerDumpPath 2>&1 | Out-Null
 
         # Verify by running a query
         $null = docker exec $script:DbContainer psql -U $script:DbUser -d $tempDb -t -c "SELECT COUNT(*) FROM organizations" 2>&1
@@ -371,7 +376,7 @@ function Test-BackupIntegrity {
 
         # Cleanup before returning
         cmd /c "docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c `"DROP DATABASE IF EXISTS $tempDb`" 2>nul"
-        if ($tempDump -and (Test-Path $tempDump)) { Remove-Item $tempDump -Force }
+        docker exec $script:DbContainer rm -f $containerGzPath $containerDumpPath 2>&1 | Out-Null
 
         if ($exitCode -eq 0) {
             Write-Log "Backup verification passed" -Level SUCCESS
@@ -387,7 +392,7 @@ function Test-BackupIntegrity {
 
         # Cleanup on error
         cmd /c "docker exec $script:DbContainer psql -U $script:DbUser -d postgres -c `"DROP DATABASE IF EXISTS $tempDb`" 2>nul"
-        if ($tempDump -and (Test-Path $tempDump)) { Remove-Item $tempDump -Force }
+        docker exec $script:DbContainer rm -f $containerGzPath $containerDumpPath 2>&1 | Out-Null
 
         return $false
     }

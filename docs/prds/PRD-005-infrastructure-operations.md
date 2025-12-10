@@ -151,8 +151,8 @@ Use if Docker Desktop auto-start is unreliable:
 |----|-------------|----------|
 | BAK-01 | Daily backup to local drive | P0 |
 | BAK-02 | Weekly backup to Google Drive | P0 |
-| BAK-03 | Retain 7 daily local backups | P0 |
-| BAK-04 | Retain 4 weekly remote backups | P0 |
+| BAK-03 | Retain 30 daily local backups (~1 month) | P0 |
+| BAK-04 | Retain 26 weekly remote backups (~6 months) | P0 |
 | BAK-05 | Backup includes full database dump | P0 |
 | BAK-06 | Backup includes Docker volume data | P1 |
 | BAK-07 | Verify backup integrity after creation | P0 |
@@ -165,19 +165,18 @@ Use if Docker Desktop auto-start is unreliable:
 ```
 D:\Backups\ra-infrastructure\
 ├── daily\
-│   ├── ra_inventory_2025-11-27.sql.gz
-│   ├── ra_inventory_2025-11-26.sql.gz
-│   └── ... (7 days retained)
+│   ├── inventory_2025-12-10.dump.gz
+│   ├── inventory_2025-12-09.dump.gz
+│   └── ... (30 days retained)
 └── logs\
     └── backup.log
 ```
 
 **Remote Backup (Google Drive):**
 ```
-Shared Drive: ra-all-purpose-backup
-└── ra-infrastructure-backup/
-    ├── ra_inventory_2025-11-24_weekly.sql.gz
-    └── ... (4 weeks retained)
+Shared Drive: ra-infrastructure-backup
+    ├── inventory_2025-12-07_weekly.dump.gz
+    └── ... (26 weeks / ~6 months retained)
 ```
 
 ### 3.3 Backup Script
@@ -189,19 +188,21 @@ Shared Drive: ra-all-purpose-backup
 - `-Verify` - Run integrity check after backup
 
 **Daily Backup Process:**
-1. Create timestamped SQL dump: `pg_dump -Fc ra_inventory`
-2. Compress: gzip
-3. Save to `D:\Backups\ra-infrastructure\daily\`
-4. Verify: Attempt restore to temp database
-5. Clean up backups older than 7 days
+1. Create dump inside container: `pg_dump -Fc -f /tmp/backup.dump`
+2. Compress inside container: `gzip`
+3. Copy to host: `D:\Backups\ra-infrastructure\daily\`
+4. Verify: Copy to container, decompress, restore to temp database, query
+5. Clean up backups older than 30 days
 6. Log results
 
 **Weekly Backup Process:**
 1. Run daily backup first
 2. Upload to Google Drive via rclone
 3. Verify upload completed
-4. Clean up remote backups older than 4 weeks
+4. Clean up remote backups older than 26 weeks
 5. Log results
+
+**Note:** All backup operations are performed inside the container to avoid PowerShell binary data handling issues that can corrupt dump files.
 
 ### 3.4 Google Drive Integration
 
@@ -227,8 +228,8 @@ Shared Drive: ra-all-purpose-backup
 
 | Type | Frequency | Time | Retention |
 |------|-----------|------|-----------|
-| Daily | Every day | 2:00 AM | 7 days |
-| Weekly | Every Sunday | 3:00 AM | 4 weeks |
+| Daily | Every day | 2:00 AM | 30 days |
+| Weekly | Every Sunday | 3:00 AM | 26 weeks (~6 months) |
 
 **Windows Task Scheduler Tasks:**
 - `ra-infrastructure-backup-daily`: Runs daily at 2:00 AM

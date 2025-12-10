@@ -46,8 +46,8 @@ cd c:\Users\ranand\workspace\personal\software\ra-infrastructure
 
 | Location | What's There |
 |----------|--------------|
-| `D:\Backups\ra-infrastructure\daily\` | Last 7 days of backups |
-| Google Drive: `ra-infrastructure-backup` | Last 4 weeks of backups |
+| `D:\Backups\ra-infrastructure\daily\` | Last 30 days of backups |
+| Google Drive: `ra-infrastructure-backup` | Last 6 months of backups |
 
 **List local backups:**
 ```powershell
