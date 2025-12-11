@@ -37,6 +37,7 @@ This database is designed to be consumed by **other repositories** for their dev
   - Disaster recovery runbook with 4-tier procedures
   - Restore script with safety backups
   - Backup verification fixed (2025-12-10) - backups now create valid, restorable dumps
+  - **Fasten Health integration** (2025-12-10) - consolidated backup supports `-IncludeFasten` flag
   - **Pending**: End-to-end DR test on separate device
 
 ## For External Repositories
@@ -56,6 +57,7 @@ See **[docs/DATABASE.md](docs/DATABASE.md)** for:
 | Database | `inventory` |
 | User | `inventory` |
 | Backups | `D:\Backups\ra-infrastructure\daily\` |
+| Fasten Backups | `D:\Backups\fasten-health\` |
 | Remote Backups | Google Drive: `ra-infrastructure-backup` |
 
 ## Quick Commands
@@ -72,6 +74,15 @@ cd cli && pip install -e ".[dev]"
 
 # Run tests
 cd cli && pytest
+
+# Backup ra-infrastructure only
+.\scripts\backup.ps1 -Type daily
+
+# Backup ra-infrastructure + Fasten Health
+.\scripts\backup.ps1 -Type daily -IncludeFasten
+
+# Weekly backup with Google Drive upload
+.\scripts\backup.ps1 -Type weekly -IncludeFasten
 ```
 
 ## Key Documents

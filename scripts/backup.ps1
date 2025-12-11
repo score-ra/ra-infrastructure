@@ -1,18 +1,25 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Backup script for ra-infrastructure database.
+    Backup script for ra-infrastructure database and Fasten Health.
 
 .DESCRIPTION
     Creates database backups with local storage and optional Google Drive upload.
-    - Daily backups: Local storage with 7-day retention
-    - Weekly backups: Uploads to Google Drive with 4-week retention
+    - Daily backups: Local storage with 30-day retention
+    - Weekly backups: Uploads to Google Drive with 6-month retention
+    - Supports backing up Fasten Health (SQLite + config) alongside PostgreSQL
 
 .PARAMETER Type
     Backup type: 'daily' or 'weekly'. Required.
 
 .PARAMETER Verify
     Run integrity check after backup by restoring to temp database.
+
+.PARAMETER IncludeFasten
+    Also backup Fasten Health data (SQLite database, certs, config, encryption key).
+
+.PARAMETER FastenOnly
+    Only backup Fasten Health, skip ra-infrastructure database.
 
 .PARAMETER Force
     Skip confirmation prompts.
@@ -27,7 +34,13 @@
     .\backup.ps1 -Type daily -Verify
 
 .EXAMPLE
-    .\backup.ps1 -Type weekly
+    .\backup.ps1 -Type daily -IncludeFasten
+
+.EXAMPLE
+    .\backup.ps1 -Type weekly -IncludeFasten
+
+.EXAMPLE
+    .\backup.ps1 -Type daily -FastenOnly
 #>
 
 [CmdletBinding()]
@@ -37,6 +50,8 @@ param(
     [string]$Type,
 
     [switch]$Verify,
+    [switch]$IncludeFasten,
+    [switch]$FastenOnly,
     [switch]$Force,
 
     [string]$BackupDir = "D:\Backups\ra-infrastructure"
@@ -60,6 +75,12 @@ $script:WeeklyRetentionWeeks = 26    # 6 months of weekly backups on Google Driv
 # rclone settings
 $script:RcloneRemote = "gdrive"
 $script:RcloneRemotePath = "ra-infrastructure-backup"
+
+# Fasten Health settings
+$script:FastenDeployDir = "C:\Users\ranand\workspace\personal\software\fasten-deploy"
+$script:FastenHealthDir = "C:\Users\ranand\workspace\personal\software\ra-fasten-health"
+$script:FastenBackupDir = "D:\Backups\fasten-health"
+$script:FastenContainer = "fasten-deploy-fasten-prod-1"
 
 # Find rclone in common locations and add to PATH if needed
 function Find-Rclone {
@@ -478,6 +499,264 @@ function Remove-OldRemoteBackups {
 
 #endregion
 
+#region Fasten Health Backup Functions
+
+function Test-FastenPrerequisites {
+    Write-Log "Checking Fasten Health prerequisites..." -Level INFO
+
+    # Check if Fasten deploy directory exists
+    if (-not (Test-Path $script:FastenDeployDir)) {
+        Write-Log "Fasten deploy directory not found: $script:FastenDeployDir" -Level ERROR
+        return $false
+    }
+
+    # Check if Fasten database exists
+    $fastenDb = Join-Path $script:FastenDeployDir "db\fasten.db"
+    if (-not (Test-Path $fastenDb)) {
+        Write-Log "Fasten database not found: $fastenDb" -Level ERROR
+        return $false
+    }
+
+    # Check if encryption key exists
+    $encryptionKey = Join-Path $script:FastenHealthDir "config\encryption_key.txt"
+    if (-not (Test-Path $encryptionKey)) {
+        Write-Log "Fasten encryption key not found: $encryptionKey" -Level WARNING
+        # Continue anyway - key might be stored elsewhere
+    }
+
+    # Check backup directory
+    if (-not (Test-Path $script:FastenBackupDir)) {
+        Write-Log "Creating Fasten backup directory: $script:FastenBackupDir" -Level INFO
+        New-Item -ItemType Directory -Path $script:FastenBackupDir -Force | Out-Null
+    }
+
+    Write-Log "Fasten prerequisites check passed" -Level SUCCESS
+    return $true
+}
+
+function New-FastenBackup {
+    param([switch]$StopContainer)
+
+    $date = Get-Date -Format "yyyy-MM-dd"
+    $backupDir = Join-Path $script:FastenBackupDir $date
+
+    Write-Log "Creating Fasten Health backup..." -Level INFO
+    Write-Log "Output directory: $backupDir" -Level INFO
+
+    # Create backup directory
+    New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+
+    try {
+        $startTime = Get-Date
+
+        # Optionally stop container for consistent backup
+        $containerWasRunning = $false
+        if ($StopContainer) {
+            $state = docker inspect --format='{{.State.Running}}' $script:FastenContainer 2>&1
+            if ($LASTEXITCODE -eq 0 -and $state -eq "true") {
+                $containerWasRunning = $true
+                Write-Log "Stopping Fasten container for consistent backup..." -Level INFO
+                docker compose -f "$script:FastenDeployDir\docker-compose.yml" stop 2>&1 | Out-Null
+                Start-Sleep -Seconds 2
+            }
+        }
+
+        # Backup database (CRITICAL)
+        Write-Log "Backing up Fasten database..." -Level INFO
+        $dbBackupDir = Join-Path $backupDir "db"
+        New-Item -ItemType Directory -Force -Path $dbBackupDir | Out-Null
+        $dbFiles = Get-ChildItem -Path "$script:FastenDeployDir\db" -ErrorAction SilentlyContinue
+        if ($dbFiles) {
+            Copy-Item -Path "$script:FastenDeployDir\db\*" -Destination $dbBackupDir -Force
+            $dbSize = (Get-ChildItem $dbBackupDir -Recurse | Measure-Object -Property Length -Sum).Sum
+            Write-Log "Database backed up: $([math]::Round($dbSize / 1MB, 2)) MB" -Level INFO
+        }
+        else {
+            Write-Log "No database files found" -Level WARNING
+        }
+
+        # Backup certificates
+        Write-Log "Backing up certificates..." -Level INFO
+        $certsBackupDir = Join-Path $backupDir "certs"
+        New-Item -ItemType Directory -Force -Path $certsBackupDir | Out-Null
+        $certsDir = Join-Path $script:FastenDeployDir "certs"
+        if (Test-Path $certsDir) {
+            Copy-Item -Path "$certsDir\*" -Destination $certsBackupDir -Force -ErrorAction SilentlyContinue
+        }
+
+        # Backup configuration files
+        Write-Log "Backing up configuration..." -Level INFO
+        $envFile = Join-Path $script:FastenDeployDir ".env"
+        if (Test-Path $envFile) {
+            Copy-Item -Path $envFile -Destination $backupDir -Force
+        }
+        $composeFile = Join-Path $script:FastenDeployDir "docker-compose.yml"
+        if (Test-Path $composeFile) {
+            Copy-Item -Path $composeFile -Destination $backupDir -Force
+        }
+
+        # Backup encryption key (CRITICAL)
+        Write-Log "Backing up encryption key..." -Level INFO
+        $encryptionKey = Join-Path $script:FastenHealthDir "config\encryption_key.txt"
+        if (Test-Path $encryptionKey) {
+            Copy-Item -Path $encryptionKey -Destination $backupDir -Force
+        }
+        else {
+            Write-Log "Encryption key not found - backup may be incomplete" -Level WARNING
+        }
+
+        # Restart container if we stopped it
+        if ($containerWasRunning) {
+            Write-Log "Starting Fasten container..." -Level INFO
+            docker compose -f "$script:FastenDeployDir\docker-compose.yml" start 2>&1 | Out-Null
+        }
+
+        # Create compressed archive
+        $archivePath = Join-Path $script:FastenBackupDir "fasten-health_${date}.zip"
+        Write-Log "Creating compressed archive..." -Level INFO
+        Compress-Archive -Path "$backupDir\*" -DestinationPath $archivePath -Force
+
+        $archiveSize = (Get-Item $archivePath).Length
+        $duration = ((Get-Date) - $startTime).TotalSeconds
+
+        Write-Log "Fasten backup completed in $([math]::Round($duration, 1)) seconds" -Level SUCCESS
+        Write-Log "Archive size: $([math]::Round($archiveSize / 1MB, 2)) MB" -Level INFO
+
+        return $archivePath
+    }
+    catch {
+        Write-Log "Fasten backup failed: $_" -Level ERROR
+
+        # Ensure container is running even on error
+        if ($StopContainer) {
+            docker compose -f "$script:FastenDeployDir\docker-compose.yml" start 2>&1 | Out-Null
+        }
+
+        return $null
+    }
+}
+
+function Remove-OldFastenBackups {
+    Write-Log "Cleaning up old Fasten backups (retention: $script:DailyRetentionDays days)..." -Level INFO
+
+    $cutoffDate = (Get-Date).AddDays(-$script:DailyRetentionDays)
+    $removedCount = 0
+
+    # Clean old daily directories
+    Get-ChildItem -Path $script:FastenBackupDir -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}$' } |
+        Where-Object {
+            try {
+                [DateTime]::ParseExact($_.Name, 'yyyy-MM-dd', $null) -lt $cutoffDate
+            }
+            catch { $false }
+        } |
+        ForEach-Object {
+            Write-Log "Removing directory: $($_.Name)" -Level INFO
+            Remove-Item $_.FullName -Recurse -Force
+            $removedCount++
+        }
+
+    # Clean old zip files
+    Get-ChildItem -Path $script:FastenBackupDir -Filter "fasten-health_*.zip" -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -lt $cutoffDate } |
+        ForEach-Object {
+            Write-Log "Removing archive: $($_.Name)" -Level INFO
+            Remove-Item $_.FullName -Force
+            $removedCount++
+        }
+
+    if ($removedCount -gt 0) {
+        Write-Log "Removed $removedCount old Fasten backup(s)" -Level SUCCESS
+    }
+    else {
+        Write-Log "No old Fasten backups to remove" -Level INFO
+    }
+}
+
+function Send-FastenToGoogleDrive {
+    param([string]$BackupFile)
+
+    $fileName = Split-Path $BackupFile -Leaf
+    $weeklyName = $fileName -replace "\.zip$", "_weekly.zip"
+
+    Write-Log "Uploading Fasten backup to Google Drive..." -Level INFO
+
+    try {
+        $startTime = Get-Date
+
+        rclone copy $BackupFile "${script:RcloneRemote}:${script:RcloneRemotePath}/" --progress 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Fasten rclone upload failed" -Level ERROR
+            return $false
+        }
+
+        # Rename to weekly
+        rclone moveto "${script:RcloneRemote}:${script:RcloneRemotePath}/$fileName" `
+                     "${script:RcloneRemote}:${script:RcloneRemotePath}/$weeklyName" 2>&1
+
+        $duration = ((Get-Date) - $startTime).TotalSeconds
+        Write-Log "Fasten upload completed in $([math]::Round($duration, 1)) seconds" -Level SUCCESS
+
+        return $true
+    }
+    catch {
+        Write-Log "Fasten upload failed: $_" -Level ERROR
+        return $false
+    }
+}
+
+function Invoke-FastenDailyBackup {
+    Write-Log "Starting Fasten Health DAILY backup..." -Level INFO
+
+    # Check prerequisites
+    if (-not (Test-FastenPrerequisites)) {
+        return $false
+    }
+
+    # Create backup (stop container for consistent SQLite backup)
+    $backupFile = New-FastenBackup -StopContainer
+    if (-not $backupFile) {
+        return $false
+    }
+
+    # Cleanup old backups
+    Remove-OldFastenBackups
+
+    return $true
+}
+
+function Invoke-FastenWeeklyBackup {
+    Write-Log "Starting Fasten Health WEEKLY backup..." -Level INFO
+
+    # First run daily backup
+    $dailySuccess = Invoke-FastenDailyBackup
+    if (-not $dailySuccess) {
+        return $false
+    }
+
+    # Get the backup file we just created
+    $latestBackup = Get-ChildItem -Path $script:FastenBackupDir -Filter "fasten-health_*.zip" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if (-not $latestBackup) {
+        Write-Log "No Fasten backup file found to upload" -Level ERROR
+        return $false
+    }
+
+    # Upload to Google Drive
+    $uploaded = Send-FastenToGoogleDrive -BackupFile $latestBackup.FullName
+    if (-not $uploaded) {
+        return $false
+    }
+
+    return $true
+}
+
+#endregion
+
 #region Main
 
 function Invoke-DailyBackup {
@@ -538,25 +817,44 @@ function Invoke-WeeklyBackup {
 function Main {
     $startTime = Get-Date
 
+    # Determine what we're backing up
+    $backupTargets = @()
+    if ($FastenOnly) {
+        $backupTargets += "Fasten Health"
+    }
+    else {
+        $backupTargets += "ra-infrastructure"
+        if ($IncludeFasten) {
+            $backupTargets += "Fasten Health"
+        }
+    }
+    $targetList = $backupTargets -join " + "
+
     Write-Host ""
-    Write-Host "=" * 50
-    Write-Host "  ra-infrastructure Backup"
+    Write-Host "=" * 60
+    Write-Host "  Consolidated Backup"
+    Write-Host "  Targets: $targetList"
     Write-Host "  Type: $Type"
     Write-Host "  $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-    Write-Host "=" * 50
+    Write-Host "=" * 60
     Write-Host ""
 
-    Write-Log "=" * 50 -Level INFO
-    Write-Log "Backup started - Type: $Type" -Level INFO
+    Write-Log "=" * 60 -Level INFO
+    Write-Log "Backup started - Type: $Type, Targets: $targetList" -Level INFO
 
-    # Check prerequisites
-    if (-not (Test-Prerequisites)) {
-        $body = @"
+    $infraSuccess = $true
+    $fastenSuccess = $true
+
+    # Check prerequisites for ra-infrastructure (unless FastenOnly)
+    if (-not $FastenOnly) {
+        if (-not (Test-Prerequisites)) {
+            $body = @"
 Backup Failed
 
 Type: $Type
+Targets: $targetList
 Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-Error: Prerequisites check failed
+Error: ra-infrastructure prerequisites check failed
 
 Please check:
 1. Docker is running
@@ -564,40 +862,69 @@ Please check:
 3. rclone is configured (for weekly backups)
 
 --
-ra-infrastructure Backup
+Consolidated Backup
 "@
-        Send-BackupAlert -Subject "[ALERT] ra-infrastructure - Backup Failed" -Body $body
-        exit 1
+            Send-BackupAlert -Subject "[ALERT] Backup Failed - ra-infrastructure" -Body $body
+            $infraSuccess = $false
+        }
+        else {
+            # Run ra-infrastructure backup
+            $infraSuccess = switch ($Type) {
+                "daily" { Invoke-DailyBackup }
+                "weekly" { Invoke-WeeklyBackup }
+            }
+        }
     }
 
-    # Run backup
-    $success = switch ($Type) {
-        "daily" { Invoke-DailyBackup }
-        "weekly" { Invoke-WeeklyBackup }
+    # Run Fasten Health backup if requested
+    if ($IncludeFasten -or $FastenOnly) {
+        Write-Log "" -Level INFO
+        Write-Log "=" * 40 -Level INFO
+        $fastenSuccess = switch ($Type) {
+            "daily" { Invoke-FastenDailyBackup }
+            "weekly" { Invoke-FastenWeeklyBackup }
+        }
     }
 
     $duration = ((Get-Date) - $startTime).TotalSeconds
 
-    if ($success) {
-        Write-Log "Backup completed successfully in $([math]::Round($duration, 1)) seconds" -Level SUCCESS
+    # Determine overall success
+    $overallSuccess = $true
+    $failedTargets = @()
+
+    if (-not $FastenOnly -and -not $infraSuccess) {
+        $overallSuccess = $false
+        $failedTargets += "ra-infrastructure"
+    }
+    if (($IncludeFasten -or $FastenOnly) -and -not $fastenSuccess) {
+        $overallSuccess = $false
+        $failedTargets += "Fasten Health"
+    }
+
+    if ($overallSuccess) {
+        Write-Log "" -Level INFO
+        Write-Log "All backups completed successfully in $([math]::Round($duration, 1)) seconds" -Level SUCCESS
         exit 0
     }
     else {
-        Write-Log "Backup failed after $([math]::Round($duration, 1)) seconds" -Level ERROR
+        $failedList = $failedTargets -join ", "
+        Write-Log "" -Level INFO
+        Write-Log "Backup failed for: $failedList (after $([math]::Round($duration, 1)) seconds)" -Level ERROR
 
         $body = @"
 Backup Failed
 
 Type: $Type
+Failed Targets: $failedList
 Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 Duration: $([math]::Round($duration, 1)) seconds
 
 Check logs at: $script:LogFile
 
 --
-ra-infrastructure Backup
+Consolidated Backup
 "@
-        Send-BackupAlert -Subject "[ALERT] ra-infrastructure - Backup Failed" -Body $body
+        Send-BackupAlert -Subject "[ALERT] Backup Failed - $failedList" -Body $body
         exit 1
     }
 }
