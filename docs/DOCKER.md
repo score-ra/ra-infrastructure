@@ -12,7 +12,7 @@ ra-infrastructure uses Docker Compose to manage three database containers that p
 │                                                                               │
 │  ┌──────────────────┐  ┌───────────────────┐  ┌──────────────────┐          │
 │  │   inventory-db   │  │ homeautomation-db │  │ inventory-pgadmin │          │
-│  │   (PostgreSQL)   │  │     (MySQL)       │  │    (pgAdmin 4)    │          │
+│  │  (PostgreSQL 16) │  │   (MySQL 5.7)     │  │    (pgAdmin 4)    │          │
 │  │                  │  │                   │  │                   │          │
 │  │  Port: 5432      │  │   Port: 3306      │  │   Port: 5050      │          │
 │  │  CPU: 1.0 max    │  │   CPU: 1.0 max    │  │   CPU: 0.5 max    │          │
@@ -57,11 +57,11 @@ ra-infrastructure uses Docker Compose to manage three database containers that p
 - `inventory_postgres_data` → `/var/lib/postgresql/data` (persistent data)
 - `../database/migrations` → `/docker-entrypoint-initdb.d` (read-only, init scripts)
 
-### homeautomation-db (MySQL 8.0)
+### homeautomation-db (MySQL 5.7)
 
 | Property | Value |
 |----------|-------|
-| **Image** | `mysql:8.0` |
+| **Image** | `mysql:5.7` |
 | **Container Name** | `homeautomation-db` |
 | **Purpose** | Database for home automation systems to log device state changes |
 | **Port** | `3306` (host) → `3306` (container) |
@@ -71,6 +71,13 @@ ra-infrastructure uses Docker Compose to manage three database containers that p
 - Provides a MySQL database for home automation systems
 - Home automation apps create their own tables in this database
 - Separate from the main inventory database for isolation
+
+**Why MySQL 5.7 (not 8.0):**
+MySQL 5.7 is used instead of 8.0 for compatibility with older .NET MySQL connectors used by home automation plugins (e.g., HomeSeer mcsMQTT). MySQL 8.0 introduced:
+- `caching_sha2_password` as the default authentication plugin (older connectors only support `mysql_native_password`)
+- `utf8mb3` charset naming (older connectors don't recognize this alias)
+
+These incompatibilities cause authentication failures and charset errors with legacy applications.
 
 **Resource Limits:**
 - CPU: 1.0 core max, 0.25 core reserved
@@ -84,6 +91,10 @@ ra-infrastructure uses Docker Compose to manage three database containers that p
 
 **Volumes:**
 - `homeautomation_mysql_data` → `/var/lib/mysql` (persistent data)
+
+**Server Configuration:**
+- `--character-set-server=utf8mb4` - UTF-8 character set
+- `--collation-server=utf8mb4_general_ci` - Case-insensitive collation
 
 **Default Credentials:**
 - Database: `homeautomation`
