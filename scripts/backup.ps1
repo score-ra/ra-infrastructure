@@ -1,13 +1,14 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Backup script for ra-infrastructure database and Fasten Health.
+    Backup script for ra-infrastructure database, MySQL (home automation), and Fasten Health.
 
 .DESCRIPTION
     Creates database backups with local storage and optional Google Drive upload.
     - Daily backups: Local storage with 30-day retention
     - Weekly backups: Uploads to Google Drive with 6-month retention
     - Supports backing up Fasten Health (SQLite + config) alongside PostgreSQL
+    - Supports backing up MySQL (home automation) database
 
 .PARAMETER Type
     Backup type: 'daily' or 'weekly'. Required.
@@ -17,6 +18,9 @@
 
 .PARAMETER IncludeFasten
     Also backup Fasten Health data (SQLite database, certs, config, encryption key).
+
+.PARAMETER IncludeMySQL
+    Also backup MySQL (home automation) database.
 
 .PARAMETER FastenOnly
     Only backup Fasten Health, skip ra-infrastructure database.
@@ -41,6 +45,12 @@
 
 .EXAMPLE
     .\backup.ps1 -Type daily -FastenOnly
+
+.EXAMPLE
+    .\backup.ps1 -Type daily -IncludeMySQL
+
+.EXAMPLE
+    .\backup.ps1 -Type weekly -IncludeFasten -IncludeMySQL
 #>
 
 [CmdletBinding()]
@@ -51,6 +61,7 @@ param(
 
     [switch]$Verify,
     [switch]$IncludeFasten,
+    [switch]$IncludeMySQL,
     [switch]$FastenOnly,
     [switch]$Force,
 
@@ -75,6 +86,13 @@ $script:WeeklyRetentionWeeks = 26    # 6 months of weekly backups on Google Driv
 # rclone settings
 $script:RcloneRemote = "gdrive"
 $script:RcloneRemotePath = "ra-infrastructure-backup"
+
+# MySQL (home automation) settings
+$script:MySqlContainer = "homeautomation-db"
+$script:MySqlDatabase = "homeautomation"
+$script:MySqlUser = "homeautomation"
+$script:MySqlPassword = "homeautomation_dev_password"
+$script:MySqlBackupDir = "D:\Backups\homeautomation-mysql"
 
 # Fasten Health settings
 $script:FastenDeployDir = "C:\Users\ranand\workspace\personal\software\fasten-deploy"
@@ -499,6 +517,297 @@ function Remove-OldRemoteBackups {
 
 #endregion
 
+#region MySQL Backup Functions
+
+function Test-MySqlPrerequisites {
+    Write-Log "Checking MySQL prerequisites..." -Level INFO
+
+    # Check Docker is running
+    try {
+        docker info 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Docker is not running" -Level ERROR
+            return $false
+        }
+    }
+    catch {
+        Write-Log "Docker is not installed or not in PATH" -Level ERROR
+        return $false
+    }
+
+    # Check container is running
+    $state = docker inspect --format='{{.State.Running}}' $script:MySqlContainer 2>&1
+    if ($LASTEXITCODE -ne 0 -or $state -ne "true") {
+        Write-Log "Container '$script:MySqlContainer' is not running" -Level ERROR
+        return $false
+    }
+
+    # Check backup directory
+    if (-not (Test-Path $script:MySqlBackupDir)) {
+        Write-Log "Creating MySQL backup directory: $script:MySqlBackupDir" -Level INFO
+        New-Item -ItemType Directory -Path $script:MySqlBackupDir -Force | Out-Null
+    }
+
+    $dailyDir = Join-Path $script:MySqlBackupDir "daily"
+    if (-not (Test-Path $dailyDir)) {
+        New-Item -ItemType Directory -Path $dailyDir -Force | Out-Null
+    }
+
+    Write-Log "MySQL prerequisites check passed" -Level SUCCESS
+    return $true
+}
+
+function New-MySqlBackup {
+    $date = Get-Date -Format "yyyy-MM-dd"
+    $dailyDir = Join-Path $script:MySqlBackupDir "daily"
+    $compressedFile = Join-Path $dailyDir "${script:MySqlDatabase}_${date}.sql.gz"
+    $containerDumpPath = "/tmp/backup_${date}.sql"
+    $containerGzPath = "${containerDumpPath}.gz"
+
+    Write-Log "Creating MySQL backup..." -Level INFO
+    Write-Log "Output: $compressedFile" -Level INFO
+
+    try {
+        $startTime = Get-Date
+
+        # Create mysqldump inside container (avoids PowerShell binary corruption)
+        docker exec $script:MySqlContainer bash -c "mysqldump -u $script:MySqlUser -p'$script:MySqlPassword' --single-transaction --routines --triggers $script:MySqlDatabase > $containerDumpPath 2>/dev/null"
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "mysqldump failed" -Level ERROR
+            return $null
+        }
+
+        # Check file was created
+        $dumpSize = docker exec $script:MySqlContainer stat -c%s $containerDumpPath 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Backup file not created in container" -Level ERROR
+            return $null
+        }
+
+        Write-Log "Dump created: $([math]::Round([int64]$dumpSize / 1MB, 2)) MB" -Level INFO
+
+        # Compress inside container
+        Write-Log "Compressing backup..." -Level INFO
+        docker exec $script:MySqlContainer gzip -f $containerDumpPath 2>&1 | Out-Null
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Compression failed" -Level ERROR
+            return $null
+        }
+
+        # Copy compressed file from container to host
+        docker cp "${script:MySqlContainer}:${containerGzPath}" $compressedFile 2>&1 | Out-Null
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Failed to copy backup from container" -Level ERROR
+            return $null
+        }
+
+        # Cleanup container files
+        docker exec $script:MySqlContainer rm -f $containerGzPath 2>&1 | Out-Null
+
+        $compressedSize = (Get-Item $compressedFile).Length
+        $duration = ((Get-Date) - $startTime).TotalSeconds
+
+        Write-Log "MySQL backup completed in $([math]::Round($duration, 1)) seconds" -Level SUCCESS
+        Write-Log "Compressed size: $([math]::Round($compressedSize / 1MB, 2)) MB" -Level INFO
+
+        return $compressedFile
+    }
+    catch {
+        Write-Log "MySQL backup failed: $_" -Level ERROR
+
+        # Cleanup container files
+        docker exec $script:MySqlContainer rm -f $containerDumpPath $containerGzPath 2>&1 | Out-Null
+        if (Test-Path $compressedFile) { Remove-Item $compressedFile -Force }
+
+        return $null
+    }
+}
+
+function Test-MySqlBackupIntegrity {
+    param([string]$BackupFile)
+
+    if (-not $Verify) {
+        return $true
+    }
+
+    Write-Log "Verifying MySQL backup integrity..." -Level INFO
+
+    $containerGzPath = "/tmp/verify_backup.sql.gz"
+    $containerDumpPath = "/tmp/verify_backup.sql"
+
+    try {
+        # Copy compressed backup file to container
+        docker cp $BackupFile "${script:MySqlContainer}:${containerGzPath}" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Failed to copy backup file to container" -Level ERROR
+            return $false
+        }
+
+        # Decompress inside the container (force overwrite if file exists)
+        docker exec $script:MySqlContainer gzip -d -k -f $containerGzPath 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Failed to decompress backup file in container" -Level ERROR
+            return $false
+        }
+
+        # Verify the SQL file is valid by checking it starts with MySQL dump header
+        $header = docker exec $script:MySqlContainer head -1 $containerDumpPath 2>&1
+        if ($header -notlike "*MySQL dump*") {
+            Write-Log "Backup file does not appear to be a valid MySQL dump" -Level ERROR
+            docker exec $script:MySqlContainer rm -f $containerGzPath $containerDumpPath 2>&1 | Out-Null
+            return $false
+        }
+
+        # Try to parse the SQL (dry run) - check syntax without executing
+        # Use mysql with --execute to parse but we create/drop a temp db
+        # Use cmd /c to suppress PowerShell treating MySQL warnings as errors
+        cmd /c "docker exec $script:MySqlContainer mysql -u root -pmysql_root_dev_password -e `"DROP DATABASE IF EXISTS verify_backup_temp; CREATE DATABASE verify_backup_temp;`" 2>nul"
+        cmd /c "docker exec $script:MySqlContainer mysql -u root -pmysql_root_dev_password verify_backup_temp -e `"SOURCE $containerDumpPath;`" 2>nul"
+        $exitCode = $LASTEXITCODE
+
+        # Cleanup
+        cmd /c "docker exec $script:MySqlContainer mysql -u root -pmysql_root_dev_password -e `"DROP DATABASE IF EXISTS verify_backup_temp;`" 2>nul"
+        docker exec $script:MySqlContainer rm -f $containerGzPath $containerDumpPath 2>&1 | Out-Null
+
+        if ($exitCode -eq 0) {
+            Write-Log "MySQL backup verification passed" -Level SUCCESS
+            return $true
+        }
+        else {
+            Write-Log "MySQL backup verification failed - SQL restore error" -Level ERROR
+            return $false
+        }
+    }
+    catch {
+        Write-Log "MySQL verification failed: $_" -Level ERROR
+
+        # Cleanup on error
+        cmd /c "docker exec $script:MySqlContainer mysql -u root -pmysql_root_dev_password -e `"DROP DATABASE IF EXISTS verify_backup_temp;`" 2>nul"
+        docker exec $script:MySqlContainer rm -f $containerGzPath $containerDumpPath 2>&1 | Out-Null
+
+        return $false
+    }
+}
+
+function Remove-OldMySqlBackups {
+    Write-Log "Cleaning up old MySQL backups (retention: $script:DailyRetentionDays days)..." -Level INFO
+
+    $dailyDir = Join-Path $script:MySqlBackupDir "daily"
+    $cutoffDate = (Get-Date).AddDays(-$script:DailyRetentionDays)
+
+    $oldFiles = Get-ChildItem -Path $dailyDir -Filter "*.sql.gz" -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -lt $cutoffDate }
+
+    if ($oldFiles) {
+        foreach ($file in $oldFiles) {
+            Write-Log "Removing: $($file.Name)" -Level INFO
+            Remove-Item $file.FullName -Force
+        }
+        Write-Log "Removed $($oldFiles.Count) old MySQL backup(s)" -Level SUCCESS
+    }
+    else {
+        Write-Log "No old MySQL backups to remove" -Level INFO
+    }
+}
+
+function Send-MySqlToGoogleDrive {
+    param([string]$BackupFile)
+
+    Write-Log "Uploading MySQL backup to Google Drive..." -Level INFO
+
+    $fileName = Split-Path $BackupFile -Leaf
+    $weeklyName = $fileName -replace "\.sql\.gz$", "_weekly.sql.gz"
+    $remotePath = "${script:RcloneRemote}:${script:RcloneRemotePath}/mysql/$weeklyName"
+
+    try {
+        $startTime = Get-Date
+
+        # Ensure mysql subdirectory exists on remote
+        rclone mkdir "${script:RcloneRemote}:${script:RcloneRemotePath}/mysql" 2>&1 | Out-Null
+
+        rclone copy $BackupFile "${script:RcloneRemote}:${script:RcloneRemotePath}/mysql/" --progress 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "MySQL rclone upload failed" -Level ERROR
+            return $false
+        }
+
+        # Rename to weekly
+        rclone moveto "${script:RcloneRemote}:${script:RcloneRemotePath}/mysql/$fileName" $remotePath 2>&1
+
+        $duration = ((Get-Date) - $startTime).TotalSeconds
+        Write-Log "MySQL upload completed in $([math]::Round($duration, 1)) seconds" -Level SUCCESS
+
+        return $true
+    }
+    catch {
+        Write-Log "MySQL upload failed: $_" -Level ERROR
+        return $false
+    }
+}
+
+function Invoke-MySqlDailyBackup {
+    Write-Log "Starting MySQL DAILY backup..." -Level INFO
+
+    # Check prerequisites
+    if (-not (Test-MySqlPrerequisites)) {
+        return $false
+    }
+
+    # Create backup
+    $backupFile = New-MySqlBackup
+    if (-not $backupFile) {
+        return $false
+    }
+
+    # Verify if requested
+    if ($Verify) {
+        $verified = Test-MySqlBackupIntegrity -BackupFile $backupFile
+        if (-not $verified) {
+            return $false
+        }
+    }
+
+    # Cleanup old backups
+    Remove-OldMySqlBackups
+
+    return $true
+}
+
+function Invoke-MySqlWeeklyBackup {
+    Write-Log "Starting MySQL WEEKLY backup..." -Level INFO
+
+    # First run daily backup
+    $dailySuccess = Invoke-MySqlDailyBackup
+    if (-not $dailySuccess) {
+        return $false
+    }
+
+    # Get the backup file we just created
+    $dailyDir = Join-Path $script:MySqlBackupDir "daily"
+    $latestBackup = Get-ChildItem -Path $dailyDir -Filter "*.sql.gz" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if (-not $latestBackup) {
+        Write-Log "No MySQL backup file found to upload" -Level ERROR
+        return $false
+    }
+
+    # Upload to Google Drive
+    $uploaded = Send-MySqlToGoogleDrive -BackupFile $latestBackup.FullName
+    if (-not $uploaded) {
+        return $false
+    }
+
+    return $true
+}
+
+#endregion
+
 #region Fasten Health Backup Functions
 
 function Test-FastenPrerequisites {
@@ -824,6 +1133,9 @@ function Main {
     }
     else {
         $backupTargets += "ra-infrastructure"
+        if ($IncludeMySQL) {
+            $backupTargets += "MySQL"
+        }
         if ($IncludeFasten) {
             $backupTargets += "Fasten Health"
         }
@@ -843,6 +1155,7 @@ function Main {
     Write-Log "Backup started - Type: $Type, Targets: $targetList" -Level INFO
 
     $infraSuccess = $true
+    $mysqlSuccess = $true
     $fastenSuccess = $true
 
     # Check prerequisites for ra-infrastructure (unless FastenOnly)
@@ -876,6 +1189,16 @@ Consolidated Backup
         }
     }
 
+    # Run MySQL backup if requested
+    if ($IncludeMySQL) {
+        Write-Log "" -Level INFO
+        Write-Log "=" * 40 -Level INFO
+        $mysqlSuccess = switch ($Type) {
+            "daily" { Invoke-MySqlDailyBackup }
+            "weekly" { Invoke-MySqlWeeklyBackup }
+        }
+    }
+
     # Run Fasten Health backup if requested
     if ($IncludeFasten -or $FastenOnly) {
         Write-Log "" -Level INFO
@@ -895,6 +1218,10 @@ Consolidated Backup
     if (-not $FastenOnly -and -not $infraSuccess) {
         $overallSuccess = $false
         $failedTargets += "ra-infrastructure"
+    }
+    if ($IncludeMySQL -and -not $mysqlSuccess) {
+        $overallSuccess = $false
+        $failedTargets += "MySQL"
     }
     if (($IncludeFasten -or $FastenOnly) -and -not $fastenSuccess) {
         $overallSuccess = $false

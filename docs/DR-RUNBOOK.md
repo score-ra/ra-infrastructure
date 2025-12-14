@@ -40,9 +40,17 @@ These PowerShell scripts automate common tasks:
 |--------|--------------|
 | `scripts\health-check.ps1` | Checks if everything is running properly |
 | `scripts\verify-startup.ps1` | Verifies services after computer restart |
-| `scripts\backup.ps1 -Type daily` | Creates a backup on your local drive |
-| `scripts\backup.ps1 -Type weekly` | Creates a backup and uploads to Google Drive |
-| `scripts\restore.ps1 -BackupFile <path>` | Restores database from a backup file |
+| `scripts\backup.ps1 -Type daily` | Creates a PostgreSQL backup on your local drive |
+| `scripts\backup.ps1 -Type daily -IncludeMySQL` | Backs up PostgreSQL + MySQL |
+| `scripts\backup.ps1 -Type weekly -IncludeMySQL` | Backs up both + uploads to Google Drive |
+| `scripts\restore.ps1 -BackupFile <path>` | Restores PostgreSQL from a backup file |
+
+### Backup Locations
+
+| Database | Local Path | Remote Path |
+|----------|------------|-------------|
+| PostgreSQL | `D:\Backups\ra-infrastructure\daily\` | `gdrive:ra-infrastructure-backup/` |
+| MySQL | `D:\Backups\homeautomation-mysql\daily\` | `gdrive:ra-infrastructure-backup/mysql/` |
 
 ---
 
@@ -51,7 +59,10 @@ These PowerShell scripts automate common tasks:
 Before starting any recovery, gather this information:
 
 - [ ] **What broke?** (container stopped, Docker crashed, data corrupted, etc.)
-- [ ] **Do we have backups?** Check: `dir D:\Backups\ra-infrastructure\daily\`
+- [ ] **Which database?** PostgreSQL (inventory) or MySQL (home automation)?
+- [ ] **Do we have backups?** Check:
+  - PostgreSQL: `dir D:\Backups\ra-infrastructure\daily\`
+  - MySQL: `dir D:\Backups\homeautomation-mysql\daily\`
 - [ ] **When was the last known working state?**
 - [ ] **Does anyone else need to know?** (other systems that use this database)
 
@@ -304,6 +315,49 @@ inv device list
 - [ ] All containers running and healthy
 - [ ] `inv db stats` shows expected record counts
 - [ ] Data queries return expected results
+
+---
+
+## MySQL Recovery (Home Automation)
+
+**When to use:** MySQL database is corrupted or needs to be restored
+
+**Time estimate:** 15 minutes
+
+### Steps
+
+**Step 1: Find your MySQL backup**
+
+```powershell
+dir D:\Backups\homeautomation-mysql\daily\ | Sort-Object LastWriteTime -Descending
+```
+
+**Step 2: Copy backup to container and restore**
+
+```powershell
+# Copy the backup to the container
+docker cp "D:\Backups\homeautomation-mysql\daily\homeautomation_YYYY-MM-DD.sql.gz" homeautomation-db:/tmp/restore.sql.gz
+
+# Decompress
+docker exec homeautomation-db gzip -d -f /tmp/restore.sql.gz
+
+# Restore (this replaces all data in the homeautomation database)
+docker exec homeautomation-db bash -c "mysql -u root -pmysql_root_dev_password homeautomation < /tmp/restore.sql"
+
+# Cleanup
+docker exec homeautomation-db rm -f /tmp/restore.sql
+```
+
+**Step 3: Verify the restoration**
+
+```powershell
+docker exec homeautomation-db mysql -u homeautomation -phomeautomation_dev_password homeautomation -e "SHOW TABLES;"
+```
+
+### Success Checklist
+- [ ] MySQL container is running and healthy
+- [ ] Tables are visible in the database
+- [ ] Home automation system can connect
 
 ---
 
@@ -849,6 +903,7 @@ docker system prune -a --volumes
 | **Docker Compose** | A tool for defining and running multiple containers together |
 | **Google Drive** | Google's cloud storage service where we keep off-site backups |
 | **Image** | A template for creating containers. Like a blueprint for a house. |
+| **MySQL** | A popular database software used for the home automation database. |
 | **OAuth** | A secure way to grant applications access to your accounts without sharing your password |
 | **pg_dump** | A PostgreSQL command that exports database contents to a file |
 | **pg_restore** | A PostgreSQL command that imports database contents from a file |

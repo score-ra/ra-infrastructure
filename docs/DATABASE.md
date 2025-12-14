@@ -362,3 +362,64 @@ inv db stats
 - Soft deletes via `is_active` flag
 - `metadata` columns are JSONB for flexible attributes
 - Slugs are unique within their parent scope (e.g., device slugs unique within site)
+
+---
+
+## MySQL Database (Home Automation)
+
+In addition to the PostgreSQL inventory database, ra-infrastructure hosts a MySQL database for home automation systems.
+
+### Connection Details
+
+| Setting | Value |
+|---------|-------|
+| **Host** | `localhost` |
+| **Port** | `3306` |
+| **Database** | `homeautomation` |
+| **User** | `homeautomation` |
+| **Password** | `homeautomation_dev_password` |
+
+### Connection String
+
+```
+mysql://homeautomation:homeautomation_dev_password@localhost:3306/homeautomation
+```
+
+### Purpose
+
+This database is designed for home automation systems to log device state changes. Unlike the PostgreSQL inventory database:
+
+- **Schema is not managed by ra-infrastructure** - home automation apps create their own tables
+- **No CLI commands** - use MySQL client tools directly
+- **Backups included** - use `.\scripts\backup.ps1 -Type daily -IncludeMySQL`
+
+### Python Connection Example
+
+```python
+import mysql.connector
+
+conn = mysql.connector.connect(
+    host="localhost",
+    port=3306,
+    database="homeautomation",
+    user="homeautomation",
+    password="homeautomation_dev_password"
+)
+
+cursor = conn.cursor(dictionary=True)
+cursor.execute("SHOW TABLES")
+tables = cursor.fetchall()
+print(tables)
+
+conn.close()
+```
+
+### SQLAlchemy Connection
+
+```python
+from sqlalchemy import create_engine
+
+engine = create_engine(
+    "mysql+mysqlconnector://homeautomation:homeautomation_dev_password@localhost:3306/homeautomation"
+)
+```

@@ -44,14 +44,25 @@ cd c:\Users\ranand\workspace\personal\software\ra-infrastructure
 
 ## Backup Locations
 
+### PostgreSQL (Inventory)
 | Location | What's There |
 |----------|--------------|
 | `D:\Backups\ra-infrastructure\daily\` | Last 30 days of backups |
-| Google Drive: `ra-infrastructure-backup` | Last 6 months of backups |
+| Google Drive: `ra-infrastructure-backup/` | Last 6 months of backups |
+
+### MySQL (Home Automation)
+| Location | What's There |
+|----------|--------------|
+| `D:\Backups\homeautomation-mysql\daily\` | Last 30 days of backups |
+| Google Drive: `ra-infrastructure-backup/mysql/` | Last 6 months of backups |
 
 **List local backups:**
 ```powershell
+# PostgreSQL
 dir D:\Backups\ra-infrastructure\daily\ | Sort-Object LastWriteTime -Descending
+
+# MySQL
+dir D:\Backups\homeautomation-mysql\daily\ | Sort-Object LastWriteTime -Descending
 ```
 
 ---

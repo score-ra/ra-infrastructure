@@ -7,12 +7,12 @@
 | Field | Value |
 |-------|-------|
 | **Phase** | Operations Ready |
-| **Last Updated** | 2025-12-10 |
+| **Last Updated** | 2025-12-14 |
 | **Purpose** | Central infrastructure database for other repositories |
 
 ## What This Repository Is
 
-**ra-infrastructure** is a standalone PostgreSQL database and CLI for managing:
+**ra-infrastructure** is a standalone database infrastructure and CLI for managing:
 - **Organizations** - Multi-tenant support
 - **Sites** - Physical locations
 - **Zones** - Logical areas within sites
@@ -38,6 +38,7 @@ This database is designed to be consumed by **other repositories** for their dev
   - Restore script with safety backups
   - Backup verification fixed (2025-12-10) - backups now create valid, restorable dumps
   - **Fasten Health integration** (2025-12-10) - consolidated backup supports `-IncludeFasten` flag
+  - **MySQL (home automation)** (2025-12-14) - consolidated backup supports `-IncludeMySQL` flag
   - **Pending**: End-to-end DR test on separate device
 
 ## For External Repositories
@@ -53,10 +54,14 @@ See **[docs/DATABASE.md](docs/DATABASE.md)** for:
 | Component | Status |
 |-----------|--------|
 | PostgreSQL | `localhost:5432` |
+| MySQL | `localhost:3306` |
 | pgAdmin | `localhost:5050` |
-| Database | `inventory` |
-| User | `inventory` |
+| Database (PostgreSQL) | `inventory` |
+| Database (MySQL) | `homeautomation` |
+| User (PostgreSQL) | `inventory` |
+| User (MySQL) | `homeautomation` |
 | Backups | `D:\Backups\ra-infrastructure\daily\` |
+| MySQL Backups | `D:\Backups\homeautomation-mysql\daily\` |
 | Fasten Backups | `D:\Backups\fasten-health\` |
 | Remote Backups | Google Drive: `ra-infrastructure-backup` |
 
@@ -78,11 +83,17 @@ cd cli && pytest
 # Backup ra-infrastructure only
 .\scripts\backup.ps1 -Type daily
 
+# Backup ra-infrastructure + MySQL (home automation)
+.\scripts\backup.ps1 -Type daily -IncludeMySQL
+
 # Backup ra-infrastructure + Fasten Health
 .\scripts\backup.ps1 -Type daily -IncludeFasten
 
+# Backup everything (ra-infrastructure + MySQL + Fasten)
+.\scripts\backup.ps1 -Type daily -IncludeMySQL -IncludeFasten
+
 # Weekly backup with Google Drive upload
-.\scripts\backup.ps1 -Type weekly -IncludeFasten
+.\scripts\backup.ps1 -Type weekly -IncludeMySQL -IncludeFasten
 ```
 
 ## Key Documents
@@ -97,6 +108,20 @@ cd cli && pytest
 
 ## Notes
 
-- Database runs on localhost:5432
+- PostgreSQL runs on localhost:5432 (inventory database)
+- MySQL runs on localhost:3306 (homeautomation database for home automation systems)
 - pgAdmin available at localhost:5050
 - GitHub repo: https://github.com/score-ra/ra-infrastructure
+
+## MySQL (Home Automation) Connection Details
+
+| Setting | Value |
+|---------|-------|
+| Host | `localhost` |
+| Port | `3306` |
+| Database | `homeautomation` |
+| Username | `homeautomation` |
+| Password | `homeautomation_dev_password` |
+| Root Password | `mysql_root_dev_password` |
+
+Connection string: `mysql://homeautomation:homeautomation_dev_password@localhost:3306/homeautomation`

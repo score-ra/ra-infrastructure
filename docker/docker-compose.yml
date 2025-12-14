@@ -29,6 +29,34 @@ services:
           cpus: '0.25'
           memory: 128M
 
+  mysql:
+    image: mysql:8.0
+    container_name: homeautomation-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql_root_dev_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-homeautomation}
+      MYSQL_USER: ${MYSQL_USER:-homeautomation}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-homeautomation_dev_password}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-mysql_root_dev_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Resource limits for local development
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: inventory-pgadmin
@@ -59,6 +87,8 @@ volumes:
     name: inventory_postgres_data
   pgadmin_data:
     name: inventory_pgadmin_data
+  mysql_data:
+    name: homeautomation_mysql_data
 
 networks:
   default:

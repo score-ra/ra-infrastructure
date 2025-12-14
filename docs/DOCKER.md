@@ -4,26 +4,26 @@ This document describes the Docker containers used by ra-infrastructure and thei
 
 ## Overview
 
-ra-infrastructure uses Docker Compose to manage two containers that provide the database layer for device inventory and network management.
+ra-infrastructure uses Docker Compose to manage three database containers that provide the data layer for device inventory, network management, and home automation logging.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Docker Environment                        │
-│                                                              │
-│  ┌──────────────────┐       ┌──────────────────┐            │
-│  │   inventory-db   │       │ inventory-pgadmin │            │
-│  │   (PostgreSQL)   │◄──────│    (pgAdmin 4)    │            │
-│  │                  │       │                   │            │
-│  │  Port: 5432      │       │   Port: 5050      │            │
-│  │  CPU: 1.0 max    │       │   CPU: 0.5 max    │            │
-│  │  RAM: 512M max   │       │   RAM: 256M max   │            │
-│  └──────────────────┘       └───────────────────┘            │
-│           │                                                  │
-│           ▼                                                  │
-│  ┌──────────────────┐                                       │
-│  │ postgres_data    │  Named volume for data persistence    │
-│  └──────────────────┘                                       │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Docker Environment                                  │
+│                                                                               │
+│  ┌──────────────────┐  ┌───────────────────┐  ┌──────────────────┐          │
+│  │   inventory-db   │  │ homeautomation-db │  │ inventory-pgadmin │          │
+│  │   (PostgreSQL)   │  │     (MySQL)       │  │    (pgAdmin 4)    │          │
+│  │                  │  │                   │  │                   │          │
+│  │  Port: 5432      │  │   Port: 3306      │  │   Port: 5050      │          │
+│  │  CPU: 1.0 max    │  │   CPU: 1.0 max    │  │   CPU: 0.5 max    │          │
+│  │  RAM: 512M max   │  │   RAM: 512M max   │  │   RAM: 256M max   │          │
+│  └──────────────────┘  └───────────────────┘  └───────────────────┘          │
+│           │                     │                                             │
+│           ▼                     ▼                                             │
+│  ┌──────────────────┐  ┌───────────────────┐                                 │
+│  │ postgres_data    │  │   mysql_data      │  Named volumes for persistence  │
+│  └──────────────────┘  └───────────────────┘                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Containers
@@ -56,6 +56,40 @@ ra-infrastructure uses Docker Compose to manage two containers that provide the 
 **Volumes:**
 - `inventory_postgres_data` → `/var/lib/postgresql/data` (persistent data)
 - `../database/migrations` → `/docker-entrypoint-initdb.d` (read-only, init scripts)
+
+### homeautomation-db (MySQL 8.0)
+
+| Property | Value |
+|----------|-------|
+| **Image** | `mysql:8.0` |
+| **Container Name** | `homeautomation-db` |
+| **Purpose** | Database for home automation systems to log device state changes |
+| **Port** | `3306` (host) → `3306` (container) |
+| **Restart Policy** | `unless-stopped` |
+
+**Purpose:**
+- Provides a MySQL database for home automation systems
+- Home automation apps create their own tables in this database
+- Separate from the main inventory database for isolation
+
+**Resource Limits:**
+- CPU: 1.0 core max, 0.25 core reserved
+- Memory: 512MB max, 128MB reserved
+
+**Health Check:**
+- Command: `mysqladmin ping -h localhost`
+- Interval: 10 seconds
+- Timeout: 5 seconds
+- Retries: 5
+
+**Volumes:**
+- `homeautomation_mysql_data` → `/var/lib/mysql` (persistent data)
+
+**Default Credentials:**
+- Database: `homeautomation`
+- User: `homeautomation`
+- Password: `homeautomation_dev_password`
+- Root Password: `mysql_root_dev_password`
 
 ### inventory-pgadmin (pgAdmin 4)
 
@@ -90,16 +124,17 @@ ra-infrastructure uses Docker Compose to manage two containers that provide the 
 | **Network Name** | `inventory_network` |
 | **Type** | Bridge (default) |
 
-Both containers communicate over `inventory_network`. From within pgAdmin, connect to the database using hostname `postgres` (Docker DNS).
+All containers communicate over `inventory_network`. From within pgAdmin, connect to PostgreSQL using hostname `postgres` (Docker DNS).
 
 ## Volumes
 
 | Volume Name | Purpose | Container Path |
 |-------------|---------|----------------|
 | `inventory_postgres_data` | PostgreSQL data persistence | `/var/lib/postgresql/data` |
+| `homeautomation_mysql_data` | MySQL data persistence | `/var/lib/mysql` |
 | `inventory_pgadmin_data` | pgAdmin configuration/sessions | `/var/lib/pgadmin` |
 
-**Important:** These volumes persist data across container restarts and rebuilds. To completely reset the database, you must remove the volumes:
+**Important:** These volumes persist data across container restarts and rebuilds. To completely reset a database, you must remove its volume:
 
 ```powershell
 docker-compose down -v  # WARNING: Deletes all data
@@ -109,12 +144,26 @@ docker-compose down -v  # WARNING: Deletes all data
 
 Configure via `docker/.env` file (copy from `.env.example`):
 
+### PostgreSQL
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `POSTGRES_DB` | `inventory` | Database name |
 | `POSTGRES_USER` | `inventory` | Database user |
 | `POSTGRES_PASSWORD` | `inventory_dev_password` | Database password |
 | `POSTGRES_PORT` | `5432` | Host port for PostgreSQL |
+
+### MySQL (Home Automation)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MYSQL_DATABASE` | `homeautomation` | Database name |
+| `MYSQL_USER` | `homeautomation` | Database user |
+| `MYSQL_PASSWORD` | `homeautomation_dev_password` | Database password |
+| `MYSQL_ROOT_PASSWORD` | `mysql_root_dev_password` | Root password |
+| `MYSQL_PORT` | `3306` | Host port for MySQL |
+
+### pgAdmin
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `PGADMIN_EMAIL` | `admin@local.dev` | pgAdmin login email |
 | `PGADMIN_PASSWORD` | `admin_dev_password` | pgAdmin login password |
 | `PGADMIN_PORT` | `5050` | Host port for pgAdmin |
@@ -167,9 +216,11 @@ inv db migrate
 inv db seed
 ```
 
-## Connecting to the Database
+## Connecting to the Databases
 
-### From Host Machine
+### PostgreSQL (Inventory)
+
+**From Host Machine:**
 ```
 Host: localhost
 Port: 5432
@@ -178,7 +229,7 @@ User: inventory
 Password: inventory_dev_password
 ```
 
-### From Another Docker Container
+**From Another Docker Container:**
 ```
 Host: postgres (or inventory-db)
 Port: 5432
@@ -187,7 +238,7 @@ User: inventory
 Password: inventory_dev_password
 ```
 
-### From pgAdmin Web UI
+**From pgAdmin Web UI:**
 1. Open `http://localhost:5050`
 2. Login with pgAdmin credentials
 3. Add server with:
@@ -195,6 +246,31 @@ Password: inventory_dev_password
    - Port: `5432`
    - Database: `ra_inventory`
    - User: `inventory`
+
+### MySQL (Home Automation)
+
+**From Host Machine:**
+```
+Host: localhost
+Port: 3306
+Database: homeautomation
+User: homeautomation
+Password: homeautomation_dev_password
+```
+
+**Connection String:**
+```
+mysql://homeautomation:homeautomation_dev_password@localhost:3306/homeautomation
+```
+
+**From Another Docker Container:**
+```
+Host: homeautomation-db
+Port: 3306
+Database: homeautomation
+User: homeautomation
+Password: homeautomation_dev_password
+```
 
 ## Troubleshooting
 
