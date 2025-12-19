@@ -133,6 +133,13 @@ inv db schema -f html
   - Email: `admin@local.dev`
   - Password: (see `.env`)
 
+## Documentation
+
+### Guides
+| Guide | Description |
+|-------|-------------|
+| [MINIX Z100-0dB Power Recovery](docs/guides/MINIX-Z100-0dB-Power-Recovery-Guide.md) | Configure auto power-on after outage for the home automation server |
+
 ## Integration with Other Repos
 
 This repo provides the central database that other repos connect to:
