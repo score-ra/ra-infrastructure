@@ -106,10 +106,36 @@ cd cli && pytest
 | [docs/prds/PRD-005-infrastructure-operations.md](docs/prds/PRD-005-infrastructure-operations.md) | Backup/DR requirements |
 | [CLAUDE.md](CLAUDE.md) | Development instructions |
 
+## Cloudflare Tunnel (External Access)
+
+Expose local services to the internet via custom domains.
+
+**Domain:** `selfwize.com`
+
+| Service | Local | Public URL |
+|---------|-------|------------|
+| Snipe-IT | http://192.168.68.56:8082 | snipe.ra.selfwize.com |
+| Fasten Health | http://192.168.68.56:9090 | fasten.ra.selfwize.com |
+
+**Status:** Pending setup (domain registered, awaiting Cloudflare configuration)
+
+**Setup:** See [docs/guides/CLOUDFLARE-TUNNEL-SETUP.md](docs/guides/CLOUDFLARE-TUNNEL-SETUP.md)
+
+```powershell
+# Install and configure (run as Admin)
+.\scripts\install-cloudflared.ps1
+
+# Manage tunnel
+.\scripts\tunnel.ps1 status   # Check status
+.\scripts\tunnel.ps1 start    # Start service
+.\scripts\tunnel.ps1 stop     # Stop service
+.\scripts\tunnel.ps1 logs     # View logs
+```
+
 ## Notes
 
 - PostgreSQL runs on localhost:5432 (inventory database)
-- MySQL runs on localhost:3306 (homeautomation database for home automation systems)
+- MySQL runs on localhost:5432 (homeautomation database for home automation systems)
 - pgAdmin available at localhost:5050
 - GitHub repo: https://github.com/score-ra/ra-infrastructure
 

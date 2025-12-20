@@ -1,0 +1,61 @@
+# Cloudflare Tunnel Configuration Template
+# Copy to: C:\Users\ranand\.cloudflared\config.yml
+# Replace placeholder: <TUNNEL-UUID>
+# Domain: selfwize.com
+
+tunnel: <TUNNEL-UUID>
+credentials-file: C:\Users\ranand\.cloudflared\<TUNNEL-UUID>.json
+
+# Logging
+loglevel: info
+
+# Ingress rules (order matters - first match wins)
+ingress:
+  # Snipe-IT Asset Management
+  # Local: http://192.168.68.56:8082
+  - hostname: snipe.ra.selfwize.com
+    service: http://192.168.68.56:8082
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+
+  # Fasten Health
+  # Local: http://192.168.68.56:9090
+  - hostname: fasten.ra.selfwize.com
+    service: http://192.168.68.56:9090
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+
+  # pgAdmin (optional - consider keeping internal only)
+  # Local: http://192.168.68.56:5050
+  # - hostname: pgadmin.ra.selfwize.com
+  #   service: http://192.168.68.56:5050
+  #   originRequest:
+  #     noTLSVerify: true
+
+  # Add more tenants/services here...
+  # - hostname: snipe.smith.selfwize.com
+  #   service: http://192.168.68.xx:8082
+
+  # Catch-all rule (required, must be last)
+  - service: http_status:404
+
+# Advanced options (uncomment if needed)
+#
+# originRequest:
+#   # Global timeout settings
+#   connectTimeout: 30s
+#   tlsTimeout: 10s
+#   tcpKeepAlive: 30s
+#   noHappyEyeballs: false
+#   keepAliveConnections: 100
+#   keepAliveTimeout: 90s
+#   httpHostHeader: ""
+#   originServerName: ""
+#   caPool: ""
+#   noTLSVerify: false
+#   disableChunkedEncoding: false
+#   proxyAddress: 127.0.0.1
+#   proxyPort: 0
+#   proxyType: ""
