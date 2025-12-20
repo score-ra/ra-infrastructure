@@ -2,6 +2,8 @@
 
 Set up Cloudflare DNS for selfwize.com with subdomain routing to dev PC via Cloudflare Tunnel.
 
+> **For new organizations:** See [CLOUDFLARE-TUNNEL-CHECKLIST.md](CLOUDFLARE-TUNNEL-CHECKLIST.md) for a streamlined step-by-step checklist.
+
 ## Overview
 
 **Domain:** `selfwize.com` (registered on Namecheap)
@@ -9,19 +11,19 @@ Set up Cloudflare DNS for selfwize.com with subdomain routing to dev PC via Clou
 **Purpose:** POC for personal information portal with subdomain-based routing
 
 ```
-Internet → stuff.selfwize.com    → Cloudflare → Tunnel → localhost:3001
-         → wellness.selfwize.com →                     → localhost:3002
+Internet → stuff.selfwize.com    → Cloudflare → Tunnel → localhost:8082 (Snipe-IT)
+         → wellness.selfwize.com →                     → https://localhost:9090 (Fasten)
          → app.selfwize.com      →                     → localhost:3000
          → api.selfwize.com      →                     → localhost:8080
 ```
 
 **Subdomain Structure:**
-| Subdomain | Purpose | Local Target |
-|-----------|---------|--------------|
-| `stuff.selfwize.com` | IT/Asset Inventory | `localhost:3001` |
-| `wellness.selfwize.com` | Medical/Health Records | `localhost:3002` |
-| `app.selfwize.com` | Main Dashboard (future) | `localhost:3000` |
-| `api.selfwize.com` | API endpoint (future) | `localhost:8080` |
+| Subdomain | Purpose | Local Target | Notes |
+|-----------|---------|--------------|-------|
+| `stuff.selfwize.com` | Snipe-IT Asset Inventory | `http://localhost:8082` | Docker port mapping |
+| `wellness.selfwize.com` | Fasten Health Records | `https://localhost:9090` | Requires noTLSVerify |
+| `app.selfwize.com` | Main Dashboard (future) | `http://localhost:3000` | Not configured |
+| `api.selfwize.com` | API endpoint (future) | `http://localhost:8080` | Not configured |
 
 ---
 
@@ -144,38 +146,40 @@ Create/edit `C:\Users\ranand\.cloudflared\config.yml`:
 # Personal Information Portal POC
 #
 # Replace <TUNNEL-UUID> with your actual tunnel ID from Phase 5
+#
+# IMPORTANT: Match ports to your ACTUAL running services!
+# Check with: docker ps --format "table {{.Names}}\t{{.Ports}}"
 
 tunnel: <TUNNEL-UUID>
 credentials-file: C:\Users\ranand\.cloudflared\<TUNNEL-UUID>.json
 
 ingress:
-  # IT/Asset Inventory (Snipe-IT, etc.)
+  # Snipe-IT Asset Inventory (Docker: port 8082 -> container 80)
   - hostname: stuff.selfwize.com
-    service: http://localhost:3001
-    originRequest:
-      noTLSVerify: true
+    service: http://localhost:8082
 
-  # Medical/Health Records (Fasten Health, etc.)
+  # Fasten Health Records (Docker: port 9090 -> container 8080)
+  # NOTE: Fasten requires HTTPS + noTLSVerify for self-signed cert
   - hostname: wellness.selfwize.com
-    service: http://localhost:3002
+    service: https://localhost:9090
     originRequest:
       noTLSVerify: true
 
   # Main Dashboard (future)
   - hostname: app.selfwize.com
     service: http://localhost:3000
-    originRequest:
-      noTLSVerify: true
 
   # API Endpoint (future)
   - hostname: api.selfwize.com
     service: http://localhost:8080
-    originRequest:
-      noTLSVerify: true
 
   # Catch-all rule (required - must be last)
   - service: http_status:404
 ```
+
+**CRITICAL:** Only use `noTLSVerify: true` for services that:
+1. Use HTTPS locally (like Fasten Health)
+2. Have self-signed certificates
 
 ### 6.2 Create DNS Records
 
@@ -339,6 +343,84 @@ For each subdomain that needs protection:
 
 ## Troubleshooting
 
+### Error 524: Timeout (MOST COMMON)
+
+**Symptom:** Browser shows "524: A timeout occurred" - Cloudflare working, Host error.
+
+**Root Cause:** Something is accepting the TCP connection but not responding to HTTP.
+
+**Diagnosis:**
+```powershell
+# 1. Check what's actually listening on your configured port
+netstat -an | findstr ":8082"
+
+# 2. Find the process
+Get-NetTCPConnection -LocalPort 8082 | Select-Object OwningProcess
+Get-Process -Id <PID> | Select-Object ProcessName, Path
+
+# 3. Test locally - does it respond?
+curl.exe -v --max-time 5 http://localhost:8082
+```
+
+**Common Causes:**
+1. **Wrong port in config** - Config says 3001 but service runs on 8082
+2. **Another app on that port** - Check what process owns the port
+3. **Service accepts but doesn't respond** - Some apps (like Z-Wave JS) accept connections but don't speak HTTP
+
+**Fix:** Update cloudflared config with correct port, then restart service.
+
+### Error 502: Bad Gateway
+
+**Symptom:** "502 Bad Gateway" error.
+
+**Root Cause:** Connection refused - nothing listening on configured port.
+
+```powershell
+# Check if service is running
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+
+# Verify port is listening
+netstat -an | findstr "LISTENING" | findstr "8082"
+```
+
+**Fix:** Start the backend service or fix the port in config.
+
+### App Redirects to Internal IP (Not Public Domain)
+
+**Symptom:** Site loads but redirects to `https://192.168.x.x:port/login` instead of the public domain.
+
+**Root Cause:** The backend app (Snipe-IT, etc.) has the internal IP configured as its URL.
+
+**Fix for Snipe-IT:**
+```powershell
+# 1. Find the docker-compose .env file
+# 2. Update APP_URL
+APP_URL=https://stuff.selfwize.com
+
+# 3. Recreate container (NOT just restart)
+docker-compose up -d --force-recreate snipeit
+
+# 4. Clear cache
+docker exec snipeit-app php artisan config:clear
+docker exec snipeit-app php artisan cache:clear
+```
+
+**Important:** The APP_URL must match exactly - including `https://` and no trailing slash.
+
+### "Client sent HTTP request to HTTPS server"
+
+**Symptom:** Error message about HTTP/HTTPS mismatch.
+
+**Root Cause:** Backend service requires HTTPS but tunnel config uses `http://`.
+
+**Fix:** Update tunnel config:
+```yaml
+- hostname: wellness.selfwize.com
+  service: https://localhost:9090   # Note: https, not http
+  originRequest:
+    noTLSVerify: true              # Required for self-signed certs
+```
+
 ### Windows Service Won't Start
 
 The most common issue. The service runs as SYSTEM and can't find the config.
@@ -379,16 +461,6 @@ nslookup stuff.selfwize.com
 
 # Should return something like:
 # stuff.selfwize.com -> <tunnel-id>.cfargotunnel.com
-```
-
-### Service Unreachable (502 Error)
-
-```powershell
-# Verify local service is running on expected port
-curl http://localhost:3001
-
-# Check if port is listening
-netstat -an | findstr "3001"
 ```
 
 ### Reset and Start Over

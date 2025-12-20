@@ -12,44 +12,31 @@
 
 ## Session Context (2025-12-20)
 
-### Cloudflare Tunnel Setup - COMPLETED (pending reboot verification)
+### Cloudflare Tunnel Setup - VERIFIED WORKING
 
 **What was done:**
 1. Registered selfwize.com with Cloudflare (nameservers: arushi/thomas)
 2. Installed cloudflared via winget
 3. Created tunnel `selfwize-dev` (ID: `1f014ff9-68ae-4033-bacf-e058b91d2df4`)
-4. Created DNS routes for 4 subdomains
+4. Created DNS routes for subdomains
 5. Installed Windows service with registry fix
 6. Enabled "Always Use HTTPS" in Cloudflare
+7. **Fixed port mappings** (was pointing to wrong ports)
+8. **Added noTLSVerify** for Fasten Health (self-signed cert)
 
-**Issue encountered:** 524 timeout errors - tunnel shows connected but requests timeout. Reboot recommended.
-
-### After Reboot - Verify These Steps:
-
-```powershell
-# 1. Check service is running
-Get-Service cloudflared
-
-# 2. Check tunnel has active connections
-& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel info selfwize-dev
-
-# 3. Test site access (should return 502 since no service on port)
-curl.exe https://stuff.selfwize.com
-
-# If 502 = SUCCESS (tunnel working, just no backend service)
-# If 524 = FAIL (tunnel not connecting)
-```
-
-**If still failing after reboot:**
-- Check Windows Event Viewer for cloudflared errors
-- Try manual run: `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" --config "C:\Program Files (x86)\cloudflared\config.yml" tunnel run`
+**E2E Validation Completed (2025-12-20):**
+- stuff.selfwize.com -> Snipe-IT (port 8082) - WORKING
+- wellness.selfwize.com -> Fasten Health (port 9090, HTTPS) - WORKING
 
 ### Files Modified This Session:
 - `docs/guides/CLOUDFLARE-TUNNEL-SETUP.md` - Complete rewrite with new subdomain structure + registry fix
+- `docs/guides/CLOUDFLARE-TUNNEL-CHECKLIST.md` - **NEW** Reusable checklist for other organizations
 - `config/cloudflare.env` - API credentials and tunnel ID
-- `config/cloudflared-config.template.yml` - Updated template
+- `config/cloudflared-config.template.yml` - Updated template with correct port mappings
 - `scripts/install-cloudflared.ps1` - Full rewrite with service registry fix
 - `scripts/setup-cloudflared-service.ps1` - New script for service-only setup
+- `scripts/fix-tunnel-ports.ps1` - Port fix script
+- `scripts/update-tunnel-config.ps1` - Config update script
 
 ## What This Repository Is
 
@@ -153,14 +140,14 @@ Expose local services to the internet via custom domains.
 
 **Domain:** `selfwize.com`
 **Tunnel:** `selfwize-dev` (ID: `1f014ff9-68ae-4033-bacf-e058b91d2df4`)
-**Status:** Installed, pending reboot verification
+**Status:** VERIFIED WORKING (2025-12-20)
 
-| Subdomain | Purpose | Local Target |
-|-----------|---------|--------------|
-| stuff.selfwize.com | IT/Asset Inventory | localhost:3001 |
-| wellness.selfwize.com | Medical/Health Records | localhost:3002 |
-| app.selfwize.com | Main Dashboard | localhost:3000 |
-| api.selfwize.com | API Endpoint | localhost:8080 |
+| Subdomain | Purpose | Local Target | Status |
+|-----------|---------|--------------|--------|
+| stuff.selfwize.com | Snipe-IT Asset Inventory | localhost:8082 | WORKING |
+| wellness.selfwize.com | Fasten Health Records | https://localhost:9090 | WORKING |
+| app.selfwize.com | Main Dashboard | localhost:3000 | Not configured |
+| api.selfwize.com | API Endpoint | localhost:8080 | Not configured |
 
 **Config locations:**
 - Service config: `C:\Program Files (x86)\cloudflared\config.yml`

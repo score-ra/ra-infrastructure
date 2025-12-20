@@ -3,7 +3,9 @@
 # For user config: Copy to C:\Users\<username>\.cloudflared\config.yml
 # For service config: Copy to C:\Program Files (x86)\cloudflared\config.yml
 #
-# Replace placeholders: <TUNNEL-UUID>
+# Replace placeholders: <TUNNEL-UUID>, <username>
+#
+# VERIFIED WORKING CONFIG (2025-12-20)
 # Domain: selfwize.com
 # Tunnel ID: 1f014ff9-68ae-4033-bacf-e058b91d2df4
 
@@ -15,41 +17,41 @@ tunnel: <TUNNEL-UUID>
 credentials-file: C:\Program Files (x86)\cloudflared\<TUNNEL-UUID>.json
 
 # Ingress rules (order matters - first match wins)
-ingress:
-  # IT/Asset Inventory (Snipe-IT, etc.)
-  - hostname: stuff.selfwize.com
-    service: http://localhost:3001
-    originRequest:
-      noTLSVerify: true
+#
+# IMPORTANT LESSONS:
+# 1. Match ports to ACTUAL Docker port mappings (run: docker ps)
+# 2. Use https:// for services that require HTTPS (like Fasten Health)
+# 3. Only add noTLSVerify for HTTPS services with self-signed certs
+# 4. Don't add noTLSVerify for HTTP services - it's unnecessary
 
-  # Medical/Health Records (Fasten Health, etc.)
+ingress:
+  # Snipe-IT Asset Inventory
+  # Docker: 0.0.0.0:8082->80/tcp (use port 8082)
+  # Protocol: HTTP (container serves HTTP on port 80)
+  - hostname: stuff.selfwize.com
+    service: http://localhost:8082
+
+  # Fasten Health Records
+  # Docker: 0.0.0.0:9090->8080/tcp (use port 9090)
+  # Protocol: HTTPS with self-signed cert (requires noTLSVerify)
   - hostname: wellness.selfwize.com
-    service: http://localhost:3002
+    service: https://localhost:9090
     originRequest:
       noTLSVerify: true
 
   # Main Dashboard (future)
   - hostname: app.selfwize.com
     service: http://localhost:3000
-    originRequest:
-      noTLSVerify: true
 
   # API Endpoint (future)
   - hostname: api.selfwize.com
     service: http://localhost:8080
-    originRequest:
-      noTLSVerify: true
 
   # Catch-all rule (required, must be last)
   - service: http_status:404
 
-# Advanced options (uncomment if needed)
-#
-# loglevel: info
-#
-# originRequest:
-#   connectTimeout: 30s
-#   tlsTimeout: 10s
-#   tcpKeepAlive: 30s
-#   keepAliveConnections: 100
-#   keepAliveTimeout: 90s
+# Notes:
+# - 502 error = service not running on that port
+# - 524 error = wrong port OR service accepts connection but doesn't respond to HTTP
+# - "HTTP to HTTPS server" error = use https:// instead of http://
+# - App redirects to internal IP = update APP_URL in app's .env file
