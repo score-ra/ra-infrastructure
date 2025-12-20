@@ -7,8 +7,49 @@
 | Field | Value |
 |-------|-------|
 | **Phase** | Operations Ready |
-| **Last Updated** | 2025-12-14 |
+| **Last Updated** | 2025-12-20 |
 | **Purpose** | Central infrastructure database for other repositories |
+
+## Session Context (2025-12-20)
+
+### Cloudflare Tunnel Setup - COMPLETED (pending reboot verification)
+
+**What was done:**
+1. Registered selfwize.com with Cloudflare (nameservers: arushi/thomas)
+2. Installed cloudflared via winget
+3. Created tunnel `selfwize-dev` (ID: `1f014ff9-68ae-4033-bacf-e058b91d2df4`)
+4. Created DNS routes for 4 subdomains
+5. Installed Windows service with registry fix
+6. Enabled "Always Use HTTPS" in Cloudflare
+
+**Issue encountered:** 524 timeout errors - tunnel shows connected but requests timeout. Reboot recommended.
+
+### After Reboot - Verify These Steps:
+
+```powershell
+# 1. Check service is running
+Get-Service cloudflared
+
+# 2. Check tunnel has active connections
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel info selfwize-dev
+
+# 3. Test site access (should return 502 since no service on port)
+curl.exe https://stuff.selfwize.com
+
+# If 502 = SUCCESS (tunnel working, just no backend service)
+# If 524 = FAIL (tunnel not connecting)
+```
+
+**If still failing after reboot:**
+- Check Windows Event Viewer for cloudflared errors
+- Try manual run: `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" --config "C:\Program Files (x86)\cloudflared\config.yml" tunnel run`
+
+### Files Modified This Session:
+- `docs/guides/CLOUDFLARE-TUNNEL-SETUP.md` - Complete rewrite with new subdomain structure + registry fix
+- `config/cloudflare.env` - API credentials and tunnel ID
+- `config/cloudflared-config.template.yml` - Updated template
+- `scripts/install-cloudflared.ps1` - Full rewrite with service registry fix
+- `scripts/setup-cloudflared-service.ps1` - New script for service-only setup
 
 ## What This Repository Is
 
@@ -111,25 +152,38 @@ cd cli && pytest
 Expose local services to the internet via custom domains.
 
 **Domain:** `selfwize.com`
+**Tunnel:** `selfwize-dev` (ID: `1f014ff9-68ae-4033-bacf-e058b91d2df4`)
+**Status:** Installed, pending reboot verification
 
-| Service | Local | Public URL |
-|---------|-------|------------|
-| Snipe-IT | http://192.168.68.56:8082 | snipe.ra.selfwize.com |
-| Fasten Health | http://192.168.68.56:9090 | fasten.ra.selfwize.com |
+| Subdomain | Purpose | Local Target |
+|-----------|---------|--------------|
+| stuff.selfwize.com | IT/Asset Inventory | localhost:3001 |
+| wellness.selfwize.com | Medical/Health Records | localhost:3002 |
+| app.selfwize.com | Main Dashboard | localhost:3000 |
+| api.selfwize.com | API Endpoint | localhost:8080 |
 
-**Status:** Pending setup (domain registered, awaiting Cloudflare configuration)
+**Config locations:**
+- Service config: `C:\Program Files (x86)\cloudflared\config.yml`
+- Credentials: `C:\Program Files (x86)\cloudflared\1f014ff9-68ae-4033-bacf-e058b91d2df4.json`
+- User config: `C:\Users\ranand\.cloudflared\config.yml`
 
-**Setup:** See [docs/guides/CLOUDFLARE-TUNNEL-SETUP.md](docs/guides/CLOUDFLARE-TUNNEL-SETUP.md)
+**Setup guide:** [docs/guides/CLOUDFLARE-TUNNEL-SETUP.md](docs/guides/CLOUDFLARE-TUNNEL-SETUP.md)
 
 ```powershell
-# Install and configure (run as Admin)
+# Service management
+Get-Service cloudflared
+Start-Service cloudflared
+Stop-Service cloudflared
+Restart-Service cloudflared
+
+# Check tunnel status
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel info selfwize-dev
+
+# Fresh install (run as Admin)
 .\scripts\install-cloudflared.ps1
 
-# Manage tunnel
-.\scripts\tunnel.ps1 status   # Check status
-.\scripts\tunnel.ps1 start    # Start service
-.\scripts\tunnel.ps1 stop     # Stop service
-.\scripts\tunnel.ps1 logs     # View logs
+# Service-only setup (if tunnel already exists)
+.\scripts\setup-cloudflared-service.ps1
 ```
 
 ## Notes

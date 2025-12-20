@@ -68,6 +68,7 @@ logs/
 # Monitoring config (contains credentials)
 config/monitoring.env
 config/rclone.conf
+config/cloudflare.env
 
 # Claude Code local settings (entire folder)
 .claude/

@@ -1,61 +1,55 @@
 # Cloudflare Tunnel Configuration Template
-# Copy to: C:\Users\ranand\.cloudflared\config.yml
-# Replace placeholder: <TUNNEL-UUID>
+#
+# For user config: Copy to C:\Users\<username>\.cloudflared\config.yml
+# For service config: Copy to C:\Program Files (x86)\cloudflared\config.yml
+#
+# Replace placeholders: <TUNNEL-UUID>
 # Domain: selfwize.com
+# Tunnel ID: 1f014ff9-68ae-4033-bacf-e058b91d2df4
 
 tunnel: <TUNNEL-UUID>
-credentials-file: C:\Users\ranand\.cloudflared\<TUNNEL-UUID>.json
 
-# Logging
-loglevel: info
+# For user config:
+# credentials-file: C:\Users\<username>\.cloudflared\<TUNNEL-UUID>.json
+# For service config:
+credentials-file: C:\Program Files (x86)\cloudflared\<TUNNEL-UUID>.json
 
 # Ingress rules (order matters - first match wins)
 ingress:
-  # Snipe-IT Asset Management
-  # Local: http://192.168.68.56:8082
-  - hostname: snipe.ra.selfwize.com
-    service: http://192.168.68.56:8082
+  # IT/Asset Inventory (Snipe-IT, etc.)
+  - hostname: stuff.selfwize.com
+    service: http://localhost:3001
     originRequest:
       noTLSVerify: true
-      connectTimeout: 30s
 
-  # Fasten Health
-  # Local: http://192.168.68.56:9090
-  - hostname: fasten.ra.selfwize.com
-    service: http://192.168.68.56:9090
+  # Medical/Health Records (Fasten Health, etc.)
+  - hostname: wellness.selfwize.com
+    service: http://localhost:3002
     originRequest:
       noTLSVerify: true
-      connectTimeout: 30s
 
-  # pgAdmin (optional - consider keeping internal only)
-  # Local: http://192.168.68.56:5050
-  # - hostname: pgadmin.ra.selfwize.com
-  #   service: http://192.168.68.56:5050
-  #   originRequest:
-  #     noTLSVerify: true
+  # Main Dashboard (future)
+  - hostname: app.selfwize.com
+    service: http://localhost:3000
+    originRequest:
+      noTLSVerify: true
 
-  # Add more tenants/services here...
-  # - hostname: snipe.smith.selfwize.com
-  #   service: http://192.168.68.xx:8082
+  # API Endpoint (future)
+  - hostname: api.selfwize.com
+    service: http://localhost:8080
+    originRequest:
+      noTLSVerify: true
 
   # Catch-all rule (required, must be last)
   - service: http_status:404
 
 # Advanced options (uncomment if needed)
 #
+# loglevel: info
+#
 # originRequest:
-#   # Global timeout settings
 #   connectTimeout: 30s
 #   tlsTimeout: 10s
 #   tcpKeepAlive: 30s
-#   noHappyEyeballs: false
 #   keepAliveConnections: 100
 #   keepAliveTimeout: 90s
-#   httpHostHeader: ""
-#   originServerName: ""
-#   caPool: ""
-#   noTLSVerify: false
-#   disableChunkedEncoding: false
-#   proxyAddress: 127.0.0.1
-#   proxyPort: 0
-#   proxyType: ""
