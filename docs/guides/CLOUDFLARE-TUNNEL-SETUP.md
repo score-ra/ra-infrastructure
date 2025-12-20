@@ -304,9 +304,11 @@ Get-WinEvent -LogName Application -FilterXPath "*[System[Provider[@Name='cloudfl
 
 ---
 
-## Phase 9: Set Up Cloudflare Access (Authentication)
+## Phase 9: Set Up Cloudflare Access (Authentication) - **REQUIRED**
 
-Protect your services with Zero Trust authentication.
+**⚠️ SECURITY REQUIREMENT:** This phase is **MANDATORY** for production deployments. Do not skip this step.
+
+Protect your services with Zero Trust authentication before exposing them to the public internet.
 
 ### 9.1 Enable Zero Trust
 
@@ -338,6 +340,23 @@ For each subdomain that needs protection:
 2. You should see Cloudflare Access login page
 3. Enter your email → receive code → verify
 4. Access granted!
+
+### 9.4 Verify Protection
+
+Run the verification script to confirm Access is enabled:
+
+```powershell
+.\scripts\verify-cloudflare-access.ps1
+```
+
+**Expected output:**
+- Protected by Access: 2/2 ✓
+- All domains show "Cloudflare Access is enabled"
+
+**For detailed implementation steps with screenshots:**
+See [CLOUDFLARE-ACCESS-IMPLEMENTATION.md](CLOUDFLARE-ACCESS-IMPLEMENTATION.md)
+
+**Related PRD:** [PRD-007: Cloudflare Access Security](../prds/PRD-007-cloudflare-access-security.md)
 
 ---
 
@@ -523,8 +542,16 @@ Get-Service cloudflared
 ## Security Notes
 
 1. **Never commit credentials** - `.cloudflared/cert.pem` and `*.json` contain secrets
-2. **Use Cloudflare Access** - Don't rely solely on application authentication
-3. **Protect health data** - Use strict email allowlist for `wellness.selfwize.com`
+2. **⚠️ IMPLEMENT CLOUDFLARE ACCESS (Phase 9 is REQUIRED)** - Don't rely solely on application authentication. See PRD-007 for requirements.
+3. **Protect health data** - Use strict email allowlist for `wellness.selfwize.com` (HIPAA compliance)
 4. **Review access logs** - Zero Trust dashboard shows all access attempts
 5. **Keep cloudflared updated** - `winget upgrade Cloudflare.cloudflared`
 6. **SSL is automatic** - Cloudflare provides free SSL certificates for all subdomains
+7. **Verify Access status regularly** - Run `.\scripts\verify-cloudflare-access.ps1` to confirm protection
+
+**WARNING:** Without Cloudflare Access, your services are publicly accessible to anyone who knows the URL. This includes:
+- Personal health records (Fasten Health)
+- Asset inventory with network topology (Snipe-IT)
+- Any other services you expose via the tunnel
+
+**Implementation is free** (up to 50 users) and takes approximately 30 minutes. There is no valid reason to skip this security control.
