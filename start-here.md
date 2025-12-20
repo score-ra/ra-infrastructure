@@ -29,14 +29,11 @@
 - wellness.selfwize.com -> Fasten Health (port 9090, HTTPS) - WORKING
 
 ### Files Modified This Session:
-- `docs/guides/CLOUDFLARE-TUNNEL-SETUP.md` - Complete rewrite with new subdomain structure + registry fix
-- `docs/guides/CLOUDFLARE-TUNNEL-CHECKLIST.md` - **NEW** Reusable checklist for other organizations
-- `config/cloudflare.env` - API credentials and tunnel ID
-- `config/cloudflared-config.template.yml` - Updated template with correct port mappings
-- `scripts/install-cloudflared.ps1` - Full rewrite with service registry fix
-- `scripts/setup-cloudflared-service.ps1` - New script for service-only setup
-- `scripts/fix-tunnel-ports.ps1` - Port fix script
-- `scripts/update-tunnel-config.ps1` - Config update script
+- `docs/prds/PRD-007-cloudflare-access-security.md` - **NEW** Requirements for Zero Trust authentication
+- `docs/guides/CLOUDFLARE-ACCESS-IMPLEMENTATION.md` - **NEW** Step-by-step implementation guide
+- `scripts/verify-cloudflare-access.ps1` - **NEW** Verification script for Access status
+- `docs/guides/CLOUDFLARE-TUNNEL-SETUP.md` - Updated Phase 9 as MANDATORY, added verification
+- `start-here.md` - Added Access status column and pending action items
 
 ## What This Repository Is
 
@@ -142,12 +139,18 @@ Expose local services to the internet via custom domains.
 **Tunnel:** `selfwize-dev` (ID: `1f014ff9-68ae-4033-bacf-e058b91d2df4`)
 **Status:** VERIFIED WORKING (2025-12-20)
 
-| Subdomain | Purpose | Local Target | Status |
-|-----------|---------|--------------|--------|
-| stuff.selfwize.com | Snipe-IT Asset Inventory | localhost:8082 | WORKING |
-| wellness.selfwize.com | Fasten Health Records | https://localhost:9090 | WORKING |
-| app.selfwize.com | Main Dashboard | localhost:3000 | Not configured |
-| api.selfwize.com | API Endpoint | localhost:8080 | Not configured |
+| Subdomain | Purpose | Local Target | Tunnel Status | Access Status |
+|-----------|---------|--------------|---------------|---------------|
+| stuff.selfwize.com | Snipe-IT Asset Inventory | localhost:8082 | ✓ WORKING | ⚠️ **PENDING** |
+| wellness.selfwize.com | Fasten Health Records | https://localhost:9090 | ✓ WORKING | ⚠️ **PENDING** |
+| app.selfwize.com | Main Dashboard | localhost:3000 | Not configured | N/A |
+| api.selfwize.com | API Endpoint | localhost:8080 | Not configured | N/A |
+
+**⚠️ SECURITY ACTION REQUIRED:** Cloudflare Access (Zero Trust authentication) needs to be implemented manually via dashboard.
+- **See:** [docs/guides/CLOUDFLARE-ACCESS-IMPLEMENTATION.md](docs/guides/CLOUDFLARE-ACCESS-IMPLEMENTATION.md) for step-by-step instructions
+- **PRD:** [PRD-007: Cloudflare Access Security](docs/prds/PRD-007-cloudflare-access-security.md)
+- **Estimated Time:** 30 minutes
+- **Priority:** HIGH - Protects sensitive health records and infrastructure data
 
 **Config locations:**
 - Service config: `C:\Program Files (x86)\cloudflared\config.yml`
@@ -171,6 +174,9 @@ Restart-Service cloudflared
 
 # Service-only setup (if tunnel already exists)
 .\scripts\setup-cloudflared-service.ps1
+
+# Verify Cloudflare Access protection
+.\scripts\verify-cloudflare-access.ps1
 ```
 
 ## Notes
