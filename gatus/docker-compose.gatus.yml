@@ -1,0 +1,39 @@
+# Gatus Service Status Monitoring for ra-infrastructure
+# PRD: docs/prds/PRD-007-service-monitoring-dashboard.md
+#
+# Quick Start:
+#   1. Ensure main infrastructure is running: cd docker && docker-compose up -d
+#   2. Copy .env.template to .env and configure SMTP
+#   3. Start Gatus: docker-compose -f docker-compose.gatus.yml up -d
+#   4. Access dashboard: http://localhost:8083
+
+services:
+  gatus:
+    image: twinproduction/gatus:latest
+    container_name: ra-status
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./config/gatus.yaml:/config/config.yaml:ro
+      - gatus-data:/data
+    env_file:
+      - .env
+    networks:
+      - inventory_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+volumes:
+  gatus-data:
+    name: ra_gatus_data
+
+networks:
+  inventory_network:
+    external: true

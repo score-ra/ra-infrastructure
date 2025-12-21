@@ -1,0 +1,120 @@
+# ra-infrastructure Service Status - Gatus Configuration
+# PRD: docs/prds/PRD-007-service-monitoring-dashboard.md
+#
+# Monitors: PostgreSQL, MySQL, pgAdmin, Cloudflare Tunnel endpoints
+# Alerts: Email only (using SMTP from .env)
+# Dashboard: http://localhost:8081
+
+# =============================================================================
+# STORAGE - SQLite for status history persistence
+# =============================================================================
+storage:
+  type: sqlite
+  path: /data/gatus.db
+
+# =============================================================================
+# WEB UI CONFIGURATION
+# =============================================================================
+web:
+  address: 0.0.0.0
+  port: 8080
+
+ui:
+  title: "ra-infrastructure Status"
+  header: "Home Infrastructure Status"
+  logo: ""
+  link: ""
+
+# =============================================================================
+# ALERTING - Email Only
+# =============================================================================
+alerting:
+  email:
+    host: "${SMTP_HOST}"
+    port: ${SMTP_PORT}
+    from: "${SMTP_FROM}"
+    username: "${SMTP_USERNAME}"
+    password: "${SMTP_PASSWORD}"
+    to: "${ALERT_EMAIL}"
+    default-alert:
+      enabled: true
+      failure-threshold: 2
+      success-threshold: 2
+      send-on-resolved: true
+
+# =============================================================================
+# ENDPOINTS - Infrastructure Services
+# =============================================================================
+endpoints:
+
+  # --------------------------------------------------------------------------
+  # DATABASE SERVICES
+  # --------------------------------------------------------------------------
+
+  - name: PostgreSQL Database
+    group: Databases
+    url: "tcp://inventory-db:5432"
+    interval: 30s
+    conditions:
+      - "[CONNECTED] == true"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
+
+  - name: MySQL Database
+    group: Databases
+    url: "tcp://homeautomation-db:3306"
+    interval: 30s
+    conditions:
+      - "[CONNECTED] == true"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
+
+  # --------------------------------------------------------------------------
+  # MANAGEMENT SERVICES
+  # --------------------------------------------------------------------------
+
+  - name: pgAdmin
+    group: Management
+    url: "http://inventory-pgadmin:80"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
+
+  # --------------------------------------------------------------------------
+  # EXTERNAL ACCESS (Cloudflare Tunnel)
+  # --------------------------------------------------------------------------
+
+  - name: Snipe-IT (External)
+    group: External Access
+    url: "https://stuff.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302, 403)"
+      - "[RESPONSE_TIME] < 10000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
+
+  - name: Fasten Health (External)
+    group: External Access
+    url: "https://wellness.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302, 403)"
+      - "[RESPONSE_TIME] < 10000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true

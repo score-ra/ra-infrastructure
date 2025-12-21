@@ -102,6 +102,7 @@ See **[docs/DATABASE.md](docs/DATABASE.md)** for:
 | PostgreSQL | `localhost:5432` |
 | MySQL | `localhost:3306` |
 | pgAdmin | `localhost:5050` |
+| **Gatus Dashboard** | `localhost:8083` |
 | Database (PostgreSQL) | `inventory` |
 | Database (MySQL) | `homeautomation` |
 | User (PostgreSQL) | `inventory` |
@@ -140,6 +141,15 @@ cd cli && pytest
 
 # Weekly backup with Google Drive upload
 .\scripts\backup.ps1 -Type weekly -IncludeMySQL -IncludeFasten
+
+# Start Gatus monitoring dashboard
+cd gatus && docker-compose -f docker-compose.gatus.yml up -d
+
+# Stop Gatus
+docker-compose -f gatus/docker-compose.gatus.yml down
+
+# View Gatus logs
+docker-compose -f gatus/docker-compose.gatus.yml logs -f
 ```
 
 ## Key Documents
@@ -150,7 +160,40 @@ cd cli && pytest
 | [docs/DR-RUNBOOK.md](docs/DR-RUNBOOK.md) | **Disaster recovery procedures** |
 | [docs/RECOVERY-QUICKSTART.md](docs/RECOVERY-QUICKSTART.md) | One-page recovery reference |
 | [docs/prds/PRD-005-infrastructure-operations.md](docs/prds/PRD-005-infrastructure-operations.md) | Backup/DR requirements |
+| [docs/prds/PRD-007-service-monitoring-dashboard.md](docs/prds/PRD-007-service-monitoring-dashboard.md) | Gatus monitoring dashboard |
+| [gatus/README.md](gatus/README.md) | Gatus quick start guide |
 | [CLAUDE.md](CLAUDE.md) | Development instructions |
+
+## Gatus Monitoring Dashboard
+
+Visual status monitoring for all infrastructure services.
+
+**PRD:** [docs/prds/PRD-007-service-monitoring-dashboard.md](docs/prds/PRD-007-service-monitoring-dashboard.md)
+
+**Dashboard:** http://localhost:8083
+
+| Service | Check Type | Interval |
+|---------|------------|----------|
+| PostgreSQL | TCP 5432 | 30s |
+| MySQL | TCP 3306 | 30s |
+| pgAdmin | HTTP | 60s |
+| Snipe-IT (External) | HTTPS + SSL | 60s |
+| Fasten Health (External) | HTTPS + SSL | 60s |
+
+**Setup:**
+```powershell
+# 1. Copy environment template
+Copy-Item gatus\.env.template gatus\.env
+
+# 2. Configure SMTP (copy from config/monitoring.env)
+notepad gatus\.env
+
+# 3. Start Gatus
+cd gatus && docker-compose -f docker-compose.gatus.yml up -d
+
+# 4. Access dashboard
+Start-Process "http://localhost:8083"
+```
 
 ## Cloudflare Tunnel (External Access)
 
