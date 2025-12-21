@@ -13,6 +13,7 @@ Set up Cloudflare DNS for selfwize.com with subdomain routing to dev PC via Clou
 ```
 Internet → stuff.selfwize.com    → Cloudflare → Tunnel → localhost:8082 (Snipe-IT)
          → wellness.selfwize.com →                     → https://localhost:9090 (Fasten)
+         → dash.selfwize.com     →                     → localhost:8083 (Gatus)
          → app.selfwize.com      →                     → localhost:3000
          → api.selfwize.com      →                     → localhost:8080
 ```
@@ -22,6 +23,7 @@ Internet → stuff.selfwize.com    → Cloudflare → Tunnel → localhost:8082 
 |-----------|---------|--------------|-------|
 | `stuff.selfwize.com` | Snipe-IT Asset Inventory | `http://localhost:8082` | Docker port mapping |
 | `wellness.selfwize.com` | Fasten Health Records | `https://localhost:9090` | Requires noTLSVerify |
+| `dash.selfwize.com` | Gatus Service Status | `http://localhost:8083` | Monitoring dashboard |
 | `app.selfwize.com` | Main Dashboard (future) | `http://localhost:3000` | Not configured |
 | `api.selfwize.com` | API endpoint (future) | `http://localhost:8080` | Not configured |
 

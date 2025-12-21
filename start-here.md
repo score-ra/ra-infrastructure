@@ -7,7 +7,7 @@
 | Field | Value |
 |-------|-------|
 | **Phase** | Operations Ready |
-| **Last Updated** | 2025-12-20 |
+| **Last Updated** | 2025-12-21 |
 | **Purpose** | Central infrastructure database for other repositories |
 
 ## Session Context (2025-12-20)
@@ -207,6 +207,7 @@ Expose local services to the internet via custom domains.
 |-----------|---------|--------------|---------------|---------------|
 | stuff.selfwize.com | Snipe-IT Asset Inventory | localhost:8082 | ✓ WORKING | ✓ **ENABLED** |
 | wellness.selfwize.com | Fasten Health Records | https://localhost:9090 | ✓ WORKING | ✓ **ENABLED** |
+| dash.selfwize.com | Gatus Status Dashboard | localhost:8083 | ✓ WORKING | ✓ **ENABLED** |
 | app.selfwize.com | Main Dashboard | localhost:3000 | Not configured | N/A |
 | api.selfwize.com | API Endpoint | localhost:8080 | Not configured | N/A |
 

@@ -54,7 +54,8 @@ docker ps --filter name=ra-status
 
 ## Dashboard Access
 
-- **URL:** http://localhost:8083
+- **Local URL:** http://localhost:8083
+- **External URL:** https://dash.selfwize.com (via Cloudflare Tunnel)
 - **Features:**
   - Real-time service status (green/red indicators)
   - Response time graphs

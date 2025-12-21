@@ -39,6 +39,12 @@ ingress:
     originRequest:
       noTLSVerify: true
 
+  # Gatus Service Status Dashboard
+  # Docker: 0.0.0.0:8083->8080/tcp (use port 8083)
+  # Protocol: HTTP
+  - hostname: dash.selfwize.com
+    service: http://localhost:8083
+
   # Main Dashboard (future)
   - hostname: app.selfwize.com
     service: http://localhost:3000
