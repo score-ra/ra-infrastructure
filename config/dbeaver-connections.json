@@ -1,0 +1,48 @@
+{
+    "folders": {},
+    "connections": {
+        "postgresql-inventory": {
+            "provider": "postgresql",
+            "driver": "postgres-jdbc",
+            "name": "ra-infrastructure (PostgreSQL)",
+            "save-password": true,
+            "configuration": {
+                "host": "192.168.68.56",
+                "port": "5432",
+                "database": "inventory",
+                "user": "inventory",
+                "password": "inventory_dev_password",
+                "type": "dev"
+            }
+        },
+        "mysql8-homeautomation": {
+            "provider": "mysql",
+            "driver": "mysql8",
+            "name": "HomeAutomation (MySQL)",
+            "save-password": true,
+            "configuration": {
+                "host": "192.168.68.56",
+                "port": "3306",
+                "database": "homeautomation",
+                "user": "homeautomation",
+                "password": "homeautomation_dev_password",
+                "type": "dev",
+                "properties": {
+                    "allowPublicKeyRetrieval": "true",
+                    "useSSL": "false"
+                }
+            }
+        }
+    },
+    "connection-types": {
+        "dev": {
+            "name": "Development",
+            "color": "255,255,255",
+            "description": "Local development database",
+            "auto-commit": true,
+            "confirm-execute": false,
+            "confirm-data-change": false,
+            "auto-close-transactions": false
+        }
+    }
+}
