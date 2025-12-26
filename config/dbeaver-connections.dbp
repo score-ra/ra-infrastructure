@@ -32,6 +32,24 @@
                     "useSSL": "false"
                 }
             }
+        },
+        "mysql8-mqtt": {
+            "provider": "mysql",
+            "driver": "mysql8",
+            "name": "MQTT (MySQL)",
+            "save-password": true,
+            "configuration": {
+                "host": "192.168.68.56",
+                "port": "3306",
+                "database": "mqtt",
+                "user": "mqtt",
+                "password": "mqtt",
+                "type": "dev",
+                "properties": {
+                    "allowPublicKeyRetrieval": "true",
+                    "useSSL": "false"
+                }
+            }
         }
     },
     "connection-types": {
