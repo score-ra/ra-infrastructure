@@ -46,6 +46,24 @@ http:
       middlewares:
         - cloudflare-headers
 
+    # Homeseer Home Automation
+    homeseer-router:
+      rule: "Host(`home.selfwize.com`)"
+      entryPoints:
+        - web
+      service: homeseer-service
+      middlewares:
+        - cloudflare-headers
+
+    # Blue Iris Security Cameras
+    blueiris-router:
+      rule: "Host(`cameras.selfwize.com`)"
+      entryPoints:
+        - web
+      service: blueiris-service
+      middlewares:
+        - cloudflare-headers
+
   services:
     # Homarr (Docker container on port 7575)
     homarr-service:
@@ -69,11 +87,24 @@ http:
       loadBalancer:
         servers:
           - url: "https://host.docker.internal:9090"
-        serversTransport: fasten-transport
+        serversTransport: selfsigned-transport
+
+    # Homeseer (HTTP on 192.168.68.56:80)
+    homeseer-service:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.68.56:80"
+
+    # Blue Iris (HTTPS on 192.168.68.56:443 with self-signed cert)
+    blueiris-service:
+      loadBalancer:
+        servers:
+          - url: "https://192.168.68.56:443"
+        serversTransport: selfsigned-transport
 
   serversTransports:
     # Transport for services with self-signed certificates
-    fasten-transport:
+    selfsigned-transport:
       insecureSkipVerify: true
 
   middlewares:

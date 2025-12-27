@@ -160,3 +160,59 @@ endpoints:
       - type: email
     ui:
       hide-hostname: true
+
+  # --------------------------------------------------------------------------
+  # HOME AUTOMATION & SECURITY
+  # --------------------------------------------------------------------------
+
+  - name: Homeseer (External)
+    group: External Access
+    url: "https://home.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302, 401)"
+      - "[RESPONSE_TIME] < 10000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
+
+  - name: Blue Iris (External)
+    group: External Access
+    url: "https://cameras.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302, 401)"
+      - "[RESPONSE_TIME] < 10000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
+
+  - name: Homeseer (Internal)
+    group: Home Automation
+    url: "http://192.168.68.56:80"
+    interval: 30s
+    conditions:
+      - "[STATUS] == any(200, 302, 401)"
+      - "[RESPONSE_TIME] < 5000"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
+
+  - name: Blue Iris (Internal)
+    group: Home Automation
+    url: "https://192.168.68.56:443"
+    client:
+      insecure: true
+    interval: 30s
+    conditions:
+      - "[STATUS] == any(200, 302, 401)"
+      - "[RESPONSE_TIME] < 5000"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
