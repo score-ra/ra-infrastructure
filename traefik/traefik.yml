@@ -34,14 +34,15 @@ entryPoints:
 
 # Providers
 providers:
-  # Docker provider - auto-discover containers with labels
-  docker:
-    endpoint: "npipe:////./pipe/docker_engine"  # Windows named pipe
-    exposedByDefault: false  # Only containers with traefik.enable=true
-    network: inventory_network
-    watch: true
+  # Docker provider disabled - Windows named pipe not supported in container
+  # docker:
+  #   endpoint: "npipe:////./pipe/docker_engine"
+  #   exposedByDefault: false
+  #   network: inventory_network
+  #   watch: true
 
-  # File provider - for external services (non-Docker apps)
+  # File provider - for all services (Docker and non-Docker)
+  # On Windows, add all services here instead of using Docker labels
   file:
     directory: "/etc/traefik/dynamic"
     watch: true
