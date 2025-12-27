@@ -1,0 +1,5 @@
+name,host,port,database,user,password,url
+# PostgreSQL example:
+# MyDB (PostgreSQL),localhost,5432,mydb,myuser,mypassword,jdbc:postgresql://localhost:5432/mydb
+# MySQL example:
+# MyDB (MySQL),localhost,3306,mydb,myuser,mypassword,jdbc:mysql://localhost:3306/mydb?allowPublicKeyRetrieval=true&useSSL=false

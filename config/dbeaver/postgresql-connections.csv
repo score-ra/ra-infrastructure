@@ -1,0 +1,2 @@
+name,host,port,database,user,password,url
+ra-infrastructure (PostgreSQL),192.168.68.56,5432,inventory,inventory,inventory_dev_password,jdbc:postgresql://192.168.68.56:5432/inventory

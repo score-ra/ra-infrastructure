@@ -1,0 +1,3 @@
+name,host,port,database,user,password,url
+HomeAutomation (MySQL),192.168.68.56,3306,homeautomation,homeautomation,homeautomation_dev_password,jdbc:mysql://192.168.68.56:3306/homeautomation?allowPublicKeyRetrieval=true&useSSL=false
+MQTT (MySQL),192.168.68.56,3306,mqtt,mqtt,mqtt,jdbc:mysql://192.168.68.56:3306/mqtt?allowPublicKeyRetrieval=true&useSSL=false

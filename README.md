@@ -133,11 +133,15 @@ inv db schema -f html
   - Email: `admin@local.dev`
   - Password: (see `.env`)
 
+- **DBeaver**: Import pre-configured connections from `config/dbeaver/`
+  - See [DBeaver Connection Import Guide](docs/guides/DBEAVER-CONNECTION-IMPORT.md)
+
 ## Documentation
 
 ### Guides
 | Guide | Description |
 |-------|-------------|
+| [DBeaver Connection Import](docs/guides/DBEAVER-CONNECTION-IMPORT.md) | Import database connections into DBeaver for SQL access |
 | [MINIX Z100-0dB Power Recovery](docs/guides/MINIX-Z100-0dB-Power-Recovery-Guide.md) | Configure auto power-on after outage for the home automation server |
 
 ## Integration with Other Repos
