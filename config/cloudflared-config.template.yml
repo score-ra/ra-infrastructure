@@ -5,7 +5,7 @@
 #
 # Replace placeholders: <TUNNEL-UUID>, <username>
 #
-# VERIFIED WORKING CONFIG (2025-12-20)
+# UPDATED: 2025-12-27 - Traefik Integration (PRD-008)
 # Domain: selfwize.com
 # Tunnel ID: 1f014ff9-68ae-4033-bacf-e058b91d2df4
 
@@ -16,48 +16,47 @@ tunnel: <TUNNEL-UUID>
 # For service config:
 credentials-file: C:\Program Files (x86)\cloudflared\<TUNNEL-UUID>.json
 
-# Ingress rules (order matters - first match wins)
+# ============================================================================
+# TRAEFIK INTEGRATION (PRD-008)
+# ============================================================================
+# All *.selfwize.com traffic is routed to Traefik reverse proxy.
+# Traefik handles routing based on Host header and Docker labels.
 #
-# IMPORTANT LESSONS:
-# 1. Match ports to ACTUAL Docker port mappings (run: docker ps)
-# 2. Use https:// for services that require HTTPS (like Fasten Health)
-# 3. Only add noTLSVerify for HTTPS services with self-signed certs
-# 4. Don't add noTLSVerify for HTTP services - it's unnecessary
+# To add a new service:
+#   1. Add traefik.enable=true label to your docker-compose
+#   2. Add traefik.http.routers.<name>.rule=Host(`<name>.selfwize.com`) label
+#   3. No changes needed here - wildcard catches all subdomains!
+#
+# For services not in Docker, add to traefik/dynamic/external-services.yml
 
 ingress:
-  # Snipe-IT Asset Inventory
-  # Docker: 0.0.0.0:8082->80/tcp (use port 8082)
-  # Protocol: HTTP (container serves HTTP on port 80)
-  - hostname: stuff.selfwize.com
-    service: http://localhost:8082
-
-  # Fasten Health Records
-  # Docker: 0.0.0.0:9090->8080/tcp (use port 9090)
-  # Protocol: HTTPS with self-signed cert (requires noTLSVerify)
-  - hostname: wellness.selfwize.com
-    service: https://localhost:9090
-    originRequest:
-      noTLSVerify: true
-
-  # Gatus Service Status Dashboard
-  # Docker: 0.0.0.0:8083->8080/tcp (use port 8083)
-  # Protocol: HTTP
-  - hostname: dash.selfwize.com
-    service: http://localhost:8083
-
-  # Main Dashboard (future)
-  - hostname: app.selfwize.com
-    service: http://localhost:3000
-
-  # API Endpoint (future)
-  - hostname: api.selfwize.com
-    service: http://localhost:8080
+  # Wildcard rule - all *.selfwize.com traffic goes to Traefik
+  - hostname: "*.selfwize.com"
+    service: http://localhost:80
 
   # Catch-all rule (required, must be last)
   - service: http_status:404
 
-# Notes:
-# - 502 error = service not running on that port
-# - 524 error = wrong port OR service accepts connection but doesn't respond to HTTP
-# - "HTTP to HTTPS server" error = use https:// instead of http://
-# - App redirects to internal IP = update APP_URL in app's .env file
+# ============================================================================
+# LEGACY CONFIG (before Traefik)
+# ============================================================================
+# Kept for reference. Remove after migration is verified.
+#
+# ingress:
+#   - hostname: stuff.selfwize.com
+#     service: http://localhost:8082
+#   - hostname: wellness.selfwize.com
+#     service: https://localhost:9090
+#     originRequest:
+#       noTLSVerify: true
+#   - hostname: dash.selfwize.com
+#     service: http://localhost:8083
+#   - service: http_status:404
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+# - 502 error = Traefik not running OR service not found by Traefik
+# - 404 error = No matching route in Traefik
+# - Check Traefik dashboard: http://localhost:8080
+# - Check cloudflared logs: cloudflared.exe tunnel --config config.yml run

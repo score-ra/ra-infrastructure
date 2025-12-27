@@ -5,7 +5,8 @@
 #   1. Ensure main infrastructure is running: cd docker && docker-compose up -d
 #   2. Copy .env.template to .env and configure SMTP
 #   3. Start Gatus: docker-compose -f docker-compose.gatus.yml up -d
-#   4. Access dashboard: http://localhost:8083
+#   4. Access dashboard: https://status.selfwize.com (via Traefik)
+#      Or locally: http://localhost:8083
 
 services:
   gatus:
@@ -13,7 +14,7 @@ services:
     container_name: ra-status
     restart: unless-stopped
     ports:
-      - "8083:8080"
+      - "8083:8080"  # Direct access (kept for local testing)
     volumes:
       - ./config/gatus.yaml:/config/config.yaml:ro
       - gatus-data:/data
@@ -21,6 +22,12 @@ services:
       - .env
     networks:
       - inventory_network
+    labels:
+      # Traefik routing (PRD-008)
+      - "traefik.enable=true"
+      - "traefik.http.routers.gatus.rule=Host(`status.selfwize.com`)"
+      - "traefik.http.routers.gatus.entrypoints=web"
+      - "traefik.http.services.gatus.loadbalancer.server.port=8080"
     deploy:
       resources:
         limits:

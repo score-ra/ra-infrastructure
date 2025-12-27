@@ -102,7 +102,9 @@ See **[docs/DATABASE.md](docs/DATABASE.md)** for:
 | PostgreSQL | `localhost:5432` |
 | MySQL | `localhost:3306` |
 | pgAdmin | `localhost:5050` |
-| **Gatus Dashboard** | `localhost:8083` |
+| **Traefik** | `localhost:80` (tunnel), `localhost:8080` (dashboard) |
+| **Homarr** | `https://dash.selfwize.com` or `localhost:7575` |
+| **Gatus Dashboard** | `https://status.selfwize.com` or `localhost:8083` |
 | Database (PostgreSQL) | `inventory` |
 | Database (MySQL) | `homeautomation` |
 | User (PostgreSQL) | `inventory` |
@@ -142,14 +144,20 @@ cd cli && pytest
 # Weekly backup with Google Drive upload
 .\scripts\backup.ps1 -Type weekly -IncludeMySQL -IncludeFasten
 
+# Start Traefik reverse proxy (PRD-008)
+cd traefik && docker-compose -f docker-compose.traefik.yml up -d
+
+# Start Homarr dashboard
+cd homarr && docker-compose -f docker-compose.homarr.yml up -d
+
 # Start Gatus monitoring dashboard
 cd gatus && docker-compose -f docker-compose.gatus.yml up -d
 
-# Stop Gatus
-docker-compose -f gatus/docker-compose.gatus.yml down
+# View Traefik dashboard (routes, services)
+Start-Process "http://localhost:8080"
 
-# View Gatus logs
-docker-compose -f gatus/docker-compose.gatus.yml logs -f
+# Stop all proxy infrastructure
+docker stop traefik homarr ra-status
 ```
 
 ## Key Documents
@@ -161,6 +169,10 @@ docker-compose -f gatus/docker-compose.gatus.yml logs -f
 | [docs/RECOVERY-QUICKSTART.md](docs/RECOVERY-QUICKSTART.md) | One-page recovery reference |
 | [docs/prds/PRD-005-infrastructure-operations.md](docs/prds/PRD-005-infrastructure-operations.md) | Backup/DR requirements |
 | [docs/prds/PRD-007-service-monitoring-dashboard.md](docs/prds/PRD-007-service-monitoring-dashboard.md) | Gatus monitoring dashboard |
+| [docs/prds/PRD-008-reverse-proxy-infrastructure.md](docs/prds/PRD-008-reverse-proxy-infrastructure.md) | **Traefik + Homarr setup** |
+| [docs/guides/TRAEFIK-SETUP.md](docs/guides/TRAEFIK-SETUP.md) | Traefik reverse proxy guide |
+| [traefik/README.md](traefik/README.md) | Traefik quick start |
+| [homarr/README.md](homarr/README.md) | Homarr dashboard guide |
 | [gatus/README.md](gatus/README.md) | Gatus quick start guide |
 | [CLAUDE.md](CLAUDE.md) | Development instructions |
 
@@ -203,13 +215,20 @@ Expose local services to the internet via custom domains.
 **Tunnel:** `selfwize-dev` (ID: `1f014ff9-68ae-4033-bacf-e058b91d2df4`)
 **Status:** VERIFIED WORKING (2025-12-20)
 
-| Subdomain | Purpose | Local Target | Tunnel Status | Access Status |
-|-----------|---------|--------------|---------------|---------------|
-| stuff.selfwize.com | Snipe-IT Asset Inventory | localhost:8082 | ✓ WORKING | ✓ **ENABLED** |
-| wellness.selfwize.com | Fasten Health Records | https://localhost:9090 | ✓ WORKING | ✓ **ENABLED** |
-| dash.selfwize.com | Gatus Status Dashboard | localhost:8083 | ✓ WORKING | ✓ **ENABLED** |
-| app.selfwize.com | Main Dashboard | localhost:3000 | Not configured | N/A |
-| api.selfwize.com | API Endpoint | localhost:8080 | Not configured | N/A |
+### Architecture (PRD-008)
+
+```
+Internet → Cloudflare (*.selfwize.com) → Tunnel → Traefik:80 → Services
+```
+
+All `*.selfwize.com` traffic flows through Traefik reverse proxy. To add new services, just add Docker labels - no Cloudflare changes needed!
+
+| Subdomain | Purpose | Routed By | Access Status |
+|-----------|---------|-----------|---------------|
+| dash.selfwize.com | Homarr Dashboard | Traefik (Docker) | Optional |
+| status.selfwize.com | Gatus Monitoring | Traefik (Docker) | Optional |
+| stuff.selfwize.com | Snipe-IT Asset Inventory | Traefik (External) | ✓ **ENABLED** |
+| wellness.selfwize.com | Fasten Health Records | Traefik (External) | ✓ **ENABLED** |
 
 **✅ SECURITY IMPLEMENTED:** Cloudflare Access (Zero Trust authentication) is now protecting both active subdomains.
 - **Team:** symphonycore (symphonycore.cloudflareaccess.com)

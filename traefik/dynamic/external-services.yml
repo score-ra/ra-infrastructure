@@ -1,0 +1,55 @@
+# External Services Configuration (non-Docker apps)
+#
+# These services run outside this docker-compose but need routing via Traefik.
+# Traefik connects to them via host.docker.internal (Docker Desktop on Windows)
+#
+# To add a new external service:
+#   1. Add a router with Host rule
+#   2. Add a service with loadBalancer pointing to host.docker.internal:port
+#   3. For HTTPS with self-signed certs, add serversTransport with insecureSkipVerify
+
+http:
+  routers:
+    # Snipe-IT Asset Inventory
+    snipeit-router:
+      rule: "Host(`stuff.selfwize.com`)"
+      entryPoints:
+        - web
+      service: snipeit-service
+      middlewares:
+        - cloudflare-headers
+
+    # Fasten Health Records
+    fasten-router:
+      rule: "Host(`wellness.selfwize.com`)"
+      entryPoints:
+        - web
+      service: fasten-service
+      middlewares:
+        - cloudflare-headers
+
+  services:
+    # Snipe-IT (HTTP on port 8082)
+    snipeit-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8082"
+
+    # Fasten Health (HTTPS on port 9090 with self-signed cert)
+    fasten-service:
+      loadBalancer:
+        servers:
+          - url: "https://host.docker.internal:9090"
+        serversTransport: fasten-transport
+
+  serversTransports:
+    # Transport for services with self-signed certificates
+    fasten-transport:
+      insecureSkipVerify: true
+
+  middlewares:
+    # Pass correct headers to backend services
+    cloudflare-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"

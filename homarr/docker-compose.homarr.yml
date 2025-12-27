@@ -1,0 +1,57 @@
+# Homarr Dashboard for ra-infrastructure
+# PRD: docs/prds/PRD-008-reverse-proxy-infrastructure.md
+#
+# Prerequisites:
+#   1. Docker Desktop running
+#   2. inventory_network exists
+#   3. Traefik running
+#
+# Quick Start:
+#   cd homarr && docker-compose -f docker-compose.homarr.yml up -d
+#
+# Access: https://dash.selfwize.com (via Cloudflare Tunnel + Traefik)
+# Local:  http://localhost:7575 (direct access, bypasses Traefik)
+
+services:
+  homarr:
+    image: ghcr.io/ajnart/homarr:latest
+    container_name: homarr
+    restart: unless-stopped
+    ports:
+      - "7575:7575"  # Direct access for initial setup
+    volumes:
+      - homarr-config:/app/data/configs
+      - homarr-icons:/app/public/icons
+      - homarr-data:/data
+      # Docker socket for optional Docker integration (container status)
+      - //./pipe/docker_engine://var/run/docker.sock:ro
+    environment:
+      - TZ=America/Los_Angeles
+    networks:
+      - inventory_network
+    labels:
+      # Traefik routing
+      - "traefik.enable=true"
+      - "traefik.http.routers.homarr.rule=Host(`dash.selfwize.com`)"
+      - "traefik.http.routers.homarr.entrypoints=web"
+      - "traefik.http.services.homarr.loadbalancer.server.port=7575"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+volumes:
+  homarr-config:
+    name: homarr_config
+  homarr-icons:
+    name: homarr_icons
+  homarr-data:
+    name: homarr_data
+
+networks:
+  inventory_network:
+    external: true

@@ -1,0 +1,47 @@
+# Traefik Reverse Proxy for ra-infrastructure
+# PRD: docs/prds/PRD-008-reverse-proxy-infrastructure.md
+#
+# Prerequisites:
+#   1. Docker Desktop running
+#   2. inventory_network exists (run: cd docker && docker-compose up -d)
+#
+# Quick Start:
+#   cd traefik && docker-compose -f docker-compose.traefik.yml up -d
+#
+# Dashboard: http://localhost:8080
+# Receives traffic from Cloudflare tunnel on port 80
+
+services:
+  traefik:
+    image: traefik:v3.2
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"           # HTTP entrypoint (receives traffic from Cloudflare tunnel)
+      - "8080:8080"       # Dashboard (internal only, not exposed via tunnel)
+    volumes:
+      # Windows Docker socket (named pipe)
+      - //./pipe/docker_engine://./pipe/docker_engine:ro
+      # Static configuration
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      # Dynamic configuration directory
+      - ./dynamic:/etc/traefik/dynamic:ro
+    networks:
+      - inventory_network
+    labels:
+      - "traefik.enable=true"
+      # Dashboard route (internal only via localhost)
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+networks:
+  inventory_network:
+    external: true

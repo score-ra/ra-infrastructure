@@ -73,6 +73,12 @@ config/cloudflare.env
 # Gatus monitoring (contains SMTP credentials)
 gatus/.env
 
+# Traefik reverse proxy
+traefik/.env
+
+# Homarr dashboard
+homarr/.env
+
 # Claude Code local settings (entire folder)
 .claude/
 
