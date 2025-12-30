@@ -7,10 +7,32 @@
 | Field | Value |
 |-------|-------|
 | **Phase** | Operations Ready |
-| **Last Updated** | 2025-12-21 |
+| **Last Updated** | 2025-12-30 |
 | **Purpose** | Central infrastructure database for other repositories |
 
-## Session Context (2025-12-20)
+## Session Context (2025-12-30)
+
+### Docker Service Outage - RESOLVED
+
+**Incident:** All Docker services were unavailable after system reboot at 5:00 AM.
+
+**Root Cause:** `com.docker.service` Windows service is set to Manual startup. Docker Desktop UI started but backend service did not.
+
+**Resolution:** Restarted Docker Desktop, all 11 containers recovered.
+
+**Post-Mortem:** [docs/post-mortems/2025-12-30-docker-service-outage.md](docs/post-mortems/2025-12-30-docker-service-outage.md)
+
+**Files Created:**
+- `docs/post-mortems/2025-12-30-docker-service-outage.md` - Full RCA and incident report
+- `scripts/check-docker-health.ps1` - Health check and auto-recovery script
+- `start-here.md` - Added Docker Troubleshooting section
+
+**Action Completed:**
+- [x] Set Docker service to Automatic startup ([Issue #2](https://github.com/score-ra/ra-infrastructure/issues/2) - Closed)
+
+---
+
+## Previous Session Context (2025-12-20)
 
 ### Cloudflare Tunnel Setup - VERIFIED WORKING ✓
 
@@ -265,10 +287,65 @@ Restart-Service cloudflared
 .\scripts\verify-cloudflare-access.ps1
 ```
 
+## Docker Troubleshooting & Recovery
+
+**Related Incident:** [2025-12-30-docker-service-outage.md](docs/post-mortems/2025-12-30-docker-service-outage.md)
+
+### Quick Health Check
+
+```powershell
+# Check if Docker is responding
+docker ps
+
+# Run automated health check
+.\scripts\check-docker-health.ps1
+
+# Auto-recover if unhealthy
+.\scripts\check-docker-health.ps1 -AutoRestart
+```
+
+### Post-Reboot Verification Checklist
+
+After any system reboot, verify:
+
+- [ ] Docker daemon is responsive: `docker ps`
+- [ ] All 11 containers are running
+- [ ] External endpoints accessible (stuff.selfwize.com, wellness.selfwize.com)
+- [ ] Gatus showing all services healthy (status.selfwize.com)
+
+### Manual Recovery Steps
+
+If Docker is not responding after reboot:
+
+```powershell
+# 1. Check Docker service status
+Get-Service -Name 'com.docker.service'
+
+# 2. If stopped, restart Docker Desktop
+Stop-Process -Name 'Docker Desktop' -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 3
+Start-Process 'C:\Program Files\Docker\Docker\Docker Desktop.exe'
+Start-Sleep -Seconds 60
+
+# 3. Verify recovery
+docker ps
+```
+
+### Prevention (Requires Admin)
+
+Set Docker service to start automatically:
+
+```powershell
+# Run as Administrator
+Set-Service -Name 'com.docker.service' -StartupType Automatic
+```
+
+---
+
 ## Notes
 
 - PostgreSQL runs on localhost:5432 (inventory database)
-- MySQL runs on localhost:5432 (homeautomation database for home automation systems)
+- MySQL runs on localhost:3306 (homeautomation database for home automation systems)
 - pgAdmin available at localhost:5050
 - GitHub repo: https://github.com/score-ra/ra-infrastructure
 
