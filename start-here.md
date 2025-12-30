@@ -30,6 +30,20 @@
 **Action Completed:**
 - [x] Set Docker service to Automatic startup ([Issue #2](https://github.com/score-ra/ra-infrastructure/issues/2) - Closed)
 
+**Verification Completed (2025-12-30):**
+- [x] Docker daemon responds: `docker ps` - All 11 containers running
+- [x] External endpoints accessible (stuff.selfwize.com, wellness.selfwize.com)
+- [x] Gatus showing healthy (status.selfwize.com)
+- [x] Cloudflared tunnel running (Automatic startup)
+
+**Root Cause Clarification:**
+The `com.docker.service` being set to Manual is **expected behavior** with Docker Desktop + WSL2. Docker Desktop manages this service internally and resets it to Manual. The real issue was that Docker Desktop only starts on **user login**, not system boot.
+
+**Permanent Fix Applied:**
+- [x] Windows auto-login configured for user `ranand`
+- Boot sequence: Power on → Windows → Auto-login → Docker Desktop starts → Containers start
+- This ensures services recover automatically after power outages
+
 ---
 
 ## Previous Session Context (2025-12-20)
@@ -331,14 +345,26 @@ Start-Sleep -Seconds 60
 docker ps
 ```
 
-### Prevention (Requires Admin)
+### Auto-Recovery Configuration (IMPLEMENTED)
 
-Set Docker service to start automatically:
+Docker Desktop + WSL2 requires user login to start. Windows auto-login is configured:
 
 ```powershell
-# Run as Administrator
-Set-Service -Name 'com.docker.service' -StartupType Automatic
+# Verify auto-login is enabled
+Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' | Select-Object AutoAdminLogon, DefaultUsername
+
+# Should show:
+# AutoAdminLogon: 1
+# DefaultUsername: ranand
 ```
+
+**Boot sequence:**
+1. Power on → Windows starts
+2. Auto-login as `ranand`
+3. Docker Desktop starts (via HKCU Run registry)
+4. All containers start automatically
+
+**Note:** `Set-Service -StartupType Automatic` does NOT work with Docker Desktop WSL2 mode - Docker Desktop resets it to Manual.
 
 ---
 

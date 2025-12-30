@@ -32,7 +32,7 @@ All Docker-based infrastructure services became unavailable after a system reboo
 
 ## Root Cause Analysis
 
-### Primary Cause: Docker Service Startup Type Misconfiguration
+### Primary Cause: Docker Desktop Requires User Login (WSL2 Mode)
 
 The `com.docker.service` Windows service is configured with **Manual** startup type:
 
@@ -42,16 +42,19 @@ Name                Status  StartType
 com.docker.service  Stopped Manual
 ```
 
-When Windows rebooted:
-1. Docker Desktop.exe was launched via `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
-2. The Docker Desktop application UI started successfully
-3. However, `com.docker.service` (the backend) did not start because it's set to Manual
-4. Docker Desktop UI was in a "starting" state indefinitely, waiting for a backend that never initialized
+**Key Finding (2025-12-30 follow-up):** Using `Set-Service -StartupType Automatic` does NOT work because Docker Desktop with WSL2 backend **intentionally resets** the service to Manual on every startup. Docker Desktop manages this service internally.
+
+The actual boot sequence issue:
+1. Windows boots
+2. `com.docker.service` is Manual (and Docker Desktop resets it to Manual anyway)
+3. Docker Desktop auto-start is in **HKCU** (user registry), not HKLM (machine)
+4. **Docker Desktop only starts when a user logs in**
+5. If no user login occurs (headless server, reboot without login), Docker never starts
 
 ### Contributing Factors
 
-1. **Race condition on startup:** Docker Desktop app expects the service to be available but doesn't reliably start it
-2. **No startup dependency enforcement:** Docker Desktop doesn't declare a dependency on `com.docker.service`
+1. **User-login dependency:** Docker Desktop auto-start relies on user login, not system boot
+2. **WSL2 architecture:** Docker Desktop manages `com.docker.service` internally, overriding manual configuration
 3. **Silent failure:** No error notification to the user that Docker wasn't fully operational
 4. **No health monitoring:** No automated alerting when Docker services go down
 
@@ -160,12 +163,22 @@ All containers have `restart: unless-stopped` policies, but these only work when
 
 ### Immediate Actions
 
-#### 1. Change Docker Service to Automatic Startup (Requires Admin)
+#### 1. Enable Windows Auto-Login (Requires Admin) - IMPLEMENTED
+
+Since Docker Desktop + WSL2 requires user login, configure Windows to auto-login:
 
 ```powershell
 # Run as Administrator
-Set-Service -Name 'com.docker.service' -StartupType Automatic
+$RegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+Set-ItemProperty -Path $RegPath -Name "AutoAdminLogon" -Value "1"
+Set-ItemProperty -Path $RegPath -Name "DefaultUsername" -Value "ranand"
+Set-ItemProperty -Path $RegPath -Name "DefaultPassword" -Value "YOUR_PASSWORD"
+
+# Verify
+Get-ItemProperty -Path $RegPath | Select-Object AutoAdminLogon, DefaultUsername
 ```
+
+**Note:** `Set-Service -StartupType Automatic` does NOT work - Docker Desktop resets it to Manual.
 
 #### 2. Configure Docker Desktop for Reliability
 
@@ -239,12 +252,13 @@ Add to operational runbook:
 
 | Priority | Action | Owner | Status |
 |----------|--------|-------|--------|
-| P0 | Set `com.docker.service` to Automatic | User (Admin required) | **DONE** (2025-12-30) |
+| P0 | ~~Set `com.docker.service` to Automatic~~ | ~~User~~ | **INEFFECTIVE** - Docker resets to Manual |
+| P0 | Enable Windows auto-login for `ranand` | User (Admin required) | **DONE** (2025-12-30) |
 | P1 | Create Docker health check script | Repo | **DONE** - `scripts/check-docker-health.ps1` |
 | P1 | Add to scheduled tasks as watchdog | User | Optional |
 | P2 | Set up external uptime monitoring | User | Optional |
 | P2 | Update start-here.md with recovery steps | Repo | **DONE** |
-| P3 | Research process manager options | User | Future |
+| P3 | Research process manager options | User | N/A (auto-login solves this) |
 
 **GitHub Issue:** [#2](https://github.com/score-ra/ra-infrastructure/issues/2) - Closed 2025-12-30
 
@@ -277,31 +291,38 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 ## Appendix B: Docker Desktop Startup Flow
 
+**Problem Flow (no user login):**
+
 ```
 Windows Boot
     │
     ├─► com.docker.service (Manual) ──► Does NOT start
     │
-    └─► Docker Desktop.exe (Auto via Registry)
-            │
-            └─► Attempts to connect to service
-                    │
-                    └─► Hangs indefinitely waiting for backend
+    └─► No user login ──► HKCU auto-start never triggers
+                              │
+                              └─► Docker Desktop never starts
+                                      │
+                                      └─► Containers remain stopped
 ```
 
-**Correct Flow (after fix):**
+**Correct Flow (with auto-login):**
 
 ```
 Windows Boot
     │
-    ├─► com.docker.service (Automatic) ──► Starts backend
-    │
-    └─► Docker Desktop.exe (Auto via Registry)
+    └─► Windows auto-login (ranand)
             │
-            └─► Connects to running service ──► Success
+            └─► HKCU\Run triggers Docker Desktop.exe
                     │
-                    └─► Containers with restart policy start
+                    └─► Docker Desktop starts com.docker.service
+                            │
+                            └─► WSL2 backend initializes
+                                    │
+                                    └─► Containers with restart policy start
 ```
+
+**Note:** `Set-Service -StartupType Automatic` does NOT work because Docker Desktop
+with WSL2 backend resets the service to Manual every time it starts.
 
 ---
 
