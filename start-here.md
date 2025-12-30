@@ -43,6 +43,49 @@ The `com.docker.service` being set to Manual is **expected behavior** with Docke
 - [x] Windows auto-login configured for user `ranand`
 - Boot sequence: Power on → Windows → Auto-login → Docker Desktop starts → Containers start
 - This ensures services recover automatically after power outages
+- **Change Request:** [CR-001-windows-auto-login.md](docs/change-requests/CR-001-windows-auto-login.md)
+
+### Reboot Test - PENDING
+
+**Purpose:** Verify auto-login and Docker auto-recovery work after reboot.
+
+**Pre-Reboot Checklist:**
+- [x] Auto-login configured: `AutoAdminLogon=1`, `DefaultUsername=ranand`
+- [x] Docker Desktop auto-start enabled (HKCU registry)
+- [x] All containers have restart policies
+- [x] Changes committed and pushed
+
+**Post-Reboot Verification (run after reboot):**
+```powershell
+# 1. Verify auto-login worked (should show current user)
+whoami
+
+# 2. Check Docker is responding
+docker ps
+
+# 3. Count running containers (expect 11)
+docker ps --format "{{.Names}}" | Measure-Object
+
+# 4. Check external endpoints
+curl.exe -s -o NUL -w "%{http_code}" https://status.selfwize.com
+curl.exe -s -o NUL -w "%{http_code}" https://stuff.selfwize.com
+curl.exe -s -o NUL -w "%{http_code}" https://wellness.selfwize.com
+
+# 5. Verify cloudflared tunnel
+Get-Service cloudflared
+```
+
+**Expected Results:**
+- [ ] Windows auto-logged in as `ranand` (no manual login required)
+- [ ] Docker daemon responsive
+- [ ] All 11 containers running
+- [ ] External endpoints returning 200/302
+- [ ] Cloudflared service running
+
+**To initiate reboot:**
+```powershell
+Restart-Computer -Force
+```
 
 ---
 
