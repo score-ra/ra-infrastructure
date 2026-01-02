@@ -82,12 +82,11 @@ http:
         servers:
           - url: "http://host.docker.internal:8082"
 
-    # Fasten Health (HTTPS on port 9090 with self-signed cert)
+    # Fasten Health (HTTP on port 9090)
     fasten-service:
       loadBalancer:
         servers:
-          - url: "https://host.docker.internal:9090"
-        serversTransport: selfsigned-transport
+          - url: "http://host.docker.internal:9090"
 
     # Homeseer (HTTP on 192.168.68.56:80)
     homeseer-service:
