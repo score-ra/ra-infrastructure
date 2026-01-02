@@ -224,6 +224,58 @@ function Send-AlertEmail {
 
 #endregion
 
+#region Container Configuration
+
+# All infrastructure containers with their properties
+# Critical: Failure = infrastructure down, alerts immediately
+# Optional: Failure = degraded service, warning only
+$script:Containers = @(
+    @{
+        Name        = "inventory-db"
+        DisplayName = "PostgreSQL"
+        Critical    = $true
+        HasHealth   = $true
+        TestQuery   = { docker exec inventory-db psql -U inventory -d inventory -c "SELECT 1" 2>&1 }
+    },
+    @{
+        Name        = "homeautomation-db"
+        DisplayName = "MySQL"
+        Critical    = $true
+        HasHealth   = $true
+        TestQuery   = $null  # Health check via Docker is sufficient
+    },
+    @{
+        Name        = "traefik"
+        DisplayName = "Traefik Proxy"
+        Critical    = $true
+        HasHealth   = $false
+        HttpCheck   = "http://localhost:8080/api/overview"
+    },
+    @{
+        Name        = "ra-status"
+        DisplayName = "Gatus Monitor"
+        Critical    = $false
+        HasHealth   = $false
+        HttpCheck   = "http://localhost:8083/health"
+    },
+    @{
+        Name        = "homarr"
+        DisplayName = "Homarr Dashboard"
+        Critical    = $false
+        HasHealth   = $false
+        HttpCheck   = "http://localhost:7575"
+    },
+    @{
+        Name        = "inventory-pgadmin"
+        DisplayName = "pgAdmin"
+        Critical    = $false
+        HasHealth   = $false
+        HttpCheck   = "http://localhost:5050"
+    }
+)
+
+#endregion
+
 #region Health Checks
 
 function Test-DockerDesktop {
@@ -242,6 +294,7 @@ function Test-DockerDesktop {
                 Success  = $false
                 Message  = "Docker Desktop is not running"
                 Duration = $duration
+                Critical = $true
             }
         }
 
@@ -251,6 +304,7 @@ function Test-DockerDesktop {
             Success  = $true
             Message  = "Docker Desktop is running"
             Duration = $duration
+            Critical = $true
         }
     }
     catch {
@@ -261,14 +315,20 @@ function Test-DockerDesktop {
             Success  = $false
             Message  = "Docker check failed: $_"
             Duration = $duration
+            Critical = $true
         }
     }
 }
 
 function Test-ContainerRunning {
-    param([string]$ContainerName)
+    param(
+        [string]$ContainerName,
+        [string]$DisplayName,
+        [bool]$Critical = $true
+    )
 
-    Write-Log "Checking container '$ContainerName'..." -Level INFO
+    $label = if ($DisplayName) { $DisplayName } else { $ContainerName }
+    Write-Log "Checking container '$label'..." -Level INFO
 
     $startTime = Get-Date
 
@@ -277,39 +337,49 @@ function Test-ContainerRunning {
         $duration = ((Get-Date) - $startTime).TotalMilliseconds
 
         if ($LASTEXITCODE -ne 0 -or $state -ne "true") {
-            Write-Log "Container '$ContainerName' is not running (${duration}ms)" -Level ERROR
+            $level = if ($Critical) { "ERROR" } else { "WARNING" }
+            Write-Log "Container '$label' is not running (${duration}ms)" -Level $level
             return @{
-                Name     = "Container_$ContainerName"
+                Name     = $label
                 Success  = $false
-                Message  = "Container '$ContainerName' is not running"
+                Message  = "Container is not running"
                 Duration = $duration
+                Critical = $Critical
             }
         }
 
-        Write-Log "Container '$ContainerName' is running (${duration}ms)" -Level SUCCESS
+        Write-Log "Container '$label' is running (${duration}ms)" -Level SUCCESS
         return @{
-            Name     = "Container_$ContainerName"
+            Name     = $label
             Success  = $true
-            Message  = "Container '$ContainerName' is running"
+            Message  = "Container is running"
             Duration = $duration
+            Critical = $Critical
         }
     }
     catch {
         $duration = ((Get-Date) - $startTime).TotalMilliseconds
-        Write-Log "Container check failed: $_ (${duration}ms)" -Level ERROR
+        $level = if ($Critical) { "ERROR" } else { "WARNING" }
+        Write-Log "Container check failed: $_ (${duration}ms)" -Level $level
         return @{
-            Name     = "Container_$ContainerName"
+            Name     = $label
             Success  = $false
             Message  = "Container check failed: $_"
             Duration = $duration
+            Critical = $Critical
         }
     }
 }
 
 function Test-ContainerHealth {
-    param([string]$ContainerName)
+    param(
+        [string]$ContainerName,
+        [string]$DisplayName,
+        [bool]$Critical = $true
+    )
 
-    Write-Log "Checking health of '$ContainerName'..." -Level INFO
+    $label = if ($DisplayName) { $DisplayName } else { $ContainerName }
+    Write-Log "Checking health of '$label'..." -Level INFO
 
     $startTime = Get-Date
 
@@ -318,80 +388,150 @@ function Test-ContainerHealth {
         $duration = ((Get-Date) - $startTime).TotalMilliseconds
 
         if ($LASTEXITCODE -ne 0) {
-            Write-Log "Health check failed for '$ContainerName' (${duration}ms)" -Level ERROR
+            $level = if ($Critical) { "ERROR" } else { "WARNING" }
+            Write-Log "Health check failed for '$label' (${duration}ms)" -Level $level
             return @{
-                Name     = "Health_$ContainerName"
+                Name     = "${label} Health"
                 Success  = $false
                 Message  = "Could not get health status"
                 Duration = $duration
+                Critical = $Critical
             }
         }
 
         if ($health -ne "healthy") {
-            Write-Log "Container '$ContainerName' is unhealthy: $health (${duration}ms)" -Level ERROR
+            $level = if ($Critical) { "ERROR" } else { "WARNING" }
+            Write-Log "Container '$label' is unhealthy: $health (${duration}ms)" -Level $level
             return @{
-                Name     = "Health_$ContainerName"
+                Name     = "${label} Health"
                 Success  = $false
-                Message  = "Container health status: $health"
+                Message  = "Health status: $health"
                 Duration = $duration
+                Critical = $Critical
             }
         }
 
-        Write-Log "Container '$ContainerName' is healthy (${duration}ms)" -Level SUCCESS
+        Write-Log "Container '$label' is healthy (${duration}ms)" -Level SUCCESS
         return @{
-            Name     = "Health_$ContainerName"
+            Name     = "${label} Health"
             Success  = $true
             Message  = "Container is healthy"
             Duration = $duration
+            Critical = $Critical
         }
     }
     catch {
         $duration = ((Get-Date) - $startTime).TotalMilliseconds
-        Write-Log "Health check failed: $_ (${duration}ms)" -Level ERROR
+        $level = if ($Critical) { "ERROR" } else { "WARNING" }
+        Write-Log "Health check failed: $_ (${duration}ms)" -Level $level
         return @{
-            Name     = "Health_$ContainerName"
+            Name     = "${label} Health"
             Success  = $false
             Message  = "Health check failed: $_"
             Duration = $duration
+            Critical = $Critical
         }
     }
 }
 
-function Test-DatabaseConnection {
-    Write-Log "Checking database connection..." -Level INFO
+function Test-HttpEndpoint {
+    param(
+        [string]$Url,
+        [string]$DisplayName,
+        [bool]$Critical = $false,
+        [int]$TimeoutSeconds = 10
+    )
+
+    Write-Log "Checking HTTP endpoint '$DisplayName'..." -Level INFO
 
     $startTime = Get-Date
 
     try {
-        $result = docker exec inventory-db psql -U inventory -d inventory -c "SELECT 1" 2>&1
+        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSeconds -ErrorAction Stop
         $duration = ((Get-Date) - $startTime).TotalMilliseconds
 
-        if ($LASTEXITCODE -ne 0) {
-            Write-Log "Database connection failed (${duration}ms)" -Level ERROR
+        if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400) {
+            Write-Log "HTTP endpoint '$DisplayName' is responsive (${duration}ms)" -Level SUCCESS
             return @{
-                Name     = "DatabaseConnection"
-                Success  = $false
-                Message  = "Database connection failed"
+                Name     = "${DisplayName} HTTP"
+                Success  = $true
+                Message  = "HTTP $($response.StatusCode)"
                 Duration = $duration
+                Critical = $Critical
             }
         }
-
-        Write-Log "Database connection successful (${duration}ms)" -Level SUCCESS
-        return @{
-            Name     = "DatabaseConnection"
-            Success  = $true
-            Message  = "Database accepts connections"
-            Duration = $duration
+        else {
+            $level = if ($Critical) { "ERROR" } else { "WARNING" }
+            Write-Log "HTTP endpoint '$DisplayName' returned $($response.StatusCode) (${duration}ms)" -Level $level
+            return @{
+                Name     = "${DisplayName} HTTP"
+                Success  = $false
+                Message  = "HTTP $($response.StatusCode)"
+                Duration = $duration
+                Critical = $Critical
+            }
         }
     }
     catch {
         $duration = ((Get-Date) - $startTime).TotalMilliseconds
-        Write-Log "Database check failed: $_ (${duration}ms)" -Level ERROR
+        $level = if ($Critical) { "ERROR" } else { "WARNING" }
+        Write-Log "HTTP check failed for '$DisplayName': $_ (${duration}ms)" -Level $level
         return @{
-            Name     = "DatabaseConnection"
+            Name     = "${DisplayName} HTTP"
             Success  = $false
-            Message  = "Database check failed: $_"
+            Message  = "HTTP check failed: $_"
             Duration = $duration
+            Critical = $Critical
+        }
+    }
+}
+
+function Test-DatabaseQuery {
+    param(
+        [scriptblock]$Query,
+        [string]$DisplayName,
+        [bool]$Critical = $true
+    )
+
+    Write-Log "Testing database query for '$DisplayName'..." -Level INFO
+
+    $startTime = Get-Date
+
+    try {
+        $result = & $Query
+        $duration = ((Get-Date) - $startTime).TotalMilliseconds
+
+        if ($LASTEXITCODE -ne 0) {
+            $level = if ($Critical) { "ERROR" } else { "WARNING" }
+            Write-Log "Database query failed for '$DisplayName' (${duration}ms)" -Level $level
+            return @{
+                Name     = "${DisplayName} Query"
+                Success  = $false
+                Message  = "Database query failed"
+                Duration = $duration
+                Critical = $Critical
+            }
+        }
+
+        Write-Log "Database query successful for '$DisplayName' (${duration}ms)" -Level SUCCESS
+        return @{
+            Name     = "${DisplayName} Query"
+            Success  = $true
+            Message  = "Database accepts queries"
+            Duration = $duration
+            Critical = $Critical
+        }
+    }
+    catch {
+        $duration = ((Get-Date) - $startTime).TotalMilliseconds
+        $level = if ($Critical) { "ERROR" } else { "WARNING" }
+        Write-Log "Database query failed: $_ (${duration}ms)" -Level $level
+        return @{
+            Name     = "${DisplayName} Query"
+            Success  = $false
+            Message  = "Database query failed: $_"
+            Duration = $duration
+            Critical = $Critical
         }
     }
 }
@@ -405,34 +545,53 @@ function Invoke-HealthChecks {
     Write-Log "=" * 50 -Level INFO
 
     $results = @()
-    $previousState = Get-CheckState
 
-    # Check 1: Docker Desktop
+    # Check 1: Docker Desktop (prerequisite for all other checks)
     $results += Test-DockerDesktop
     if (-not $results[-1].Success) {
-        # If Docker is down, skip remaining checks
         Write-Log "Docker not running - skipping remaining checks" -Level WARNING
         return $results
     }
 
-    # Check 2: inventory-db container running
-    $results += Test-ContainerRunning -ContainerName "inventory-db"
-    if (-not $results[-1].Success) {
-        return $results
+    # Check all configured containers
+    foreach ($container in $script:Containers) {
+        # Check if container is running
+        $runResult = Test-ContainerRunning `
+            -ContainerName $container.Name `
+            -DisplayName $container.DisplayName `
+            -Critical $container.Critical
+
+        $results += $runResult
+
+        # Skip further checks for this container if not running
+        if (-not $runResult.Success) {
+            continue
+        }
+
+        # Check Docker health status if container has healthcheck
+        if ($container.HasHealth) {
+            $results += Test-ContainerHealth `
+                -ContainerName $container.Name `
+                -DisplayName $container.DisplayName `
+                -Critical $container.Critical
+        }
+
+        # Run database query test if defined
+        if ($container.TestQuery) {
+            $results += Test-DatabaseQuery `
+                -Query $container.TestQuery `
+                -DisplayName $container.DisplayName `
+                -Critical $container.Critical
+        }
+
+        # Check HTTP endpoint if defined
+        if ($container.HttpCheck) {
+            $results += Test-HttpEndpoint `
+                -Url $container.HttpCheck `
+                -DisplayName $container.DisplayName `
+                -Critical $container.Critical
+        }
     }
-
-    # Check 3: inventory-db health
-    $results += Test-ContainerHealth -ContainerName "inventory-db"
-
-    # Check 4: Database connection
-    $results += Test-DatabaseConnection
-
-    # Check 5: pgAdmin container (optional - warning only)
-    $pgadminResult = Test-ContainerRunning -ContainerName "inventory-pgadmin"
-    if (-not $pgadminResult.Success) {
-        Write-Log "pgAdmin container not running (optional)" -Level WARNING
-    }
-    # Don't add to results as it's optional
 
     return $results
 }
@@ -444,10 +603,15 @@ function Send-Alerts {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
     foreach ($result in $Results) {
+        # Only send alerts for critical services
+        if (-not $result.Critical) {
+            continue
+        }
+
         if (-not $result.Success) {
-            $subject = "[ALERT] ra-infrastructure - $($result.Name) Failed"
+            $subject = "[CRITICAL] ra-infrastructure - $($result.Name) Failed"
             $body = @"
-Health Check Alert
+CRITICAL Health Check Alert
 
 Host: $hostname
 Time: $timestamp
@@ -455,11 +619,13 @@ Check: $($result.Name)
 Status: FAILED
 Message: $($result.Message)
 Duration: $($result.Duration)ms
+Severity: CRITICAL
 
 Suggested Actions:
 1. Check Docker Desktop is running
 2. Run: docker-compose -f docker/docker-compose.yml ps
 3. Check logs: docker-compose -f docker/docker-compose.yml logs
+4. Run health check: .\scripts\health-check.ps1 -SkipEmail
 
 --
 ra-infrastructure Health Monitor
@@ -496,44 +662,99 @@ function Show-Summary {
     param([array]$Results)
 
     Write-Host ""
-    Write-Host "=" * 50
+    Write-Host "=" * 60
     Write-Host "  Health Check Summary"
-    Write-Host "=" * 50
+    Write-Host "=" * 60
     Write-Host ""
 
+    $criticalPassed = $true
     $allPassed = $true
+    $criticalCount = 0
+    $optionalCount = 0
+    $criticalFailed = 0
+    $optionalFailed = 0
 
-    foreach ($result in $Results) {
-        $status = if ($result.Success) { "OK" } else { "FAILED" }
-        $color = if ($result.Success) { "Green" } else { "Red" }
-        Write-Host ("  {0,-30} [{1}]" -f $result.Name, $status) -ForegroundColor $color
+    # Group results by criticality
+    $criticalResults = $Results | Where-Object { $_.Critical -eq $true }
+    $optionalResults = $Results | Where-Object { $_.Critical -eq $false }
 
-        if (-not $result.Success) {
-            $allPassed = $false
+    # Display critical services
+    if ($criticalResults) {
+        Write-Host "  CRITICAL SERVICES" -ForegroundColor White
+        Write-Host "  -----------------" -ForegroundColor DarkGray
+        foreach ($result in $criticalResults) {
+            $criticalCount++
+            $status = if ($result.Success) { "OK" } else { "FAILED" }
+            $color = if ($result.Success) { "Green" } else { "Red" }
+            $duration = if ($result.Duration) { " ($([int]$result.Duration)ms)" } else { "" }
+            Write-Host ("  {0,-35} [{1}]{2}" -f $result.Name, $status, $duration) -ForegroundColor $color
+
+            if (-not $result.Success) {
+                $criticalPassed = $false
+                $allPassed = $false
+                $criticalFailed++
+            }
         }
+        Write-Host ""
     }
 
-    Write-Host ""
+    # Display optional services
+    if ($optionalResults) {
+        Write-Host "  OPTIONAL SERVICES" -ForegroundColor White
+        Write-Host "  -----------------" -ForegroundColor DarkGray
+        foreach ($result in $optionalResults) {
+            $optionalCount++
+            $status = if ($result.Success) { "OK" } else { "WARN" }
+            $color = if ($result.Success) { "Green" } else { "Yellow" }
+            $duration = if ($result.Duration) { " ($([int]$result.Duration)ms)" } else { "" }
+            Write-Host ("  {0,-35} [{1}]{2}" -f $result.Name, $status, $duration) -ForegroundColor $color
 
-    if ($allPassed) {
-        Write-Log "All health checks passed" -Level SUCCESS
+            if (-not $result.Success) {
+                $allPassed = $false
+                $optionalFailed++
+            }
+        }
+        Write-Host ""
+    }
+
+    # Summary line
+    Write-Host "=" * 60
+    $totalChecks = $Results.Count
+    $passedChecks = ($Results | Where-Object { $_.Success }).Count
+
+    if ($criticalPassed -and $allPassed) {
+        Write-Host "  RESULT: ALL CHECKS PASSED ($passedChecks/$totalChecks)" -ForegroundColor Green
+        Write-Log "All $totalChecks health checks passed" -Level SUCCESS
+    }
+    elseif ($criticalPassed) {
+        Write-Host "  RESULT: DEGRADED - $optionalFailed optional service(s) down ($passedChecks/$totalChecks passed)" -ForegroundColor Yellow
+        Write-Log "Infrastructure operational but degraded: $optionalFailed optional service(s) failed" -Level WARNING
     }
     else {
-        Write-Log "One or more health checks failed" -Level ERROR
+        Write-Host "  RESULT: CRITICAL FAILURE - $criticalFailed critical service(s) down ($passedChecks/$totalChecks passed)" -ForegroundColor Red
+        Write-Log "CRITICAL: $criticalFailed critical service(s) failed" -Level ERROR
     }
+    Write-Host "=" * 60
+    Write-Host ""
 
-    return $allPassed
+    # Return $true only if all critical services are healthy
+    return $criticalPassed
 }
 
 # Main execution
 function Main {
     $startTime = Get-Date
 
+    $containerCount = $script:Containers.Count
+    $criticalCount = ($script:Containers | Where-Object { $_.Critical }).Count
+    $optionalCount = $containerCount - $criticalCount
+
     Write-Host ""
-    Write-Host "=" * 50
+    Write-Host "=" * 60
     Write-Host "  ra-infrastructure Health Check"
     Write-Host "  $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-    Write-Host "=" * 50
+    Write-Host "  Checking $containerCount containers ($criticalCount critical, $optionalCount optional)"
+    Write-Host "=" * 60
     Write-Host ""
 
     # Run health checks
