@@ -64,6 +64,24 @@ http:
       middlewares:
         - cloudflare-headers
 
+    # Family Contacts (Gramps Web) - ra-life-tracker
+    family-router:
+      rule: "Host(`family.selfwize.com`)"
+      entryPoints:
+        - web
+      service: family-service
+      middlewares:
+        - cloudflare-headers
+
+    # Daily Event Log - ra-life-tracker
+    events-router:
+      rule: "Host(`events.selfwize.com`)"
+      entryPoints:
+        - web
+      service: events-service
+      middlewares:
+        - cloudflare-headers
+
   services:
     # Homarr (Docker container on port 7575)
     homarr-service:
@@ -100,6 +118,18 @@ http:
         servers:
           - url: "https://192.168.68.56:443"
         serversTransport: selfsigned-transport
+
+    # Family Contacts / Gramps Web (HTTP on port 5000)
+    family-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:5000"
+
+    # Daily Event Log (HTTP on port 8000)
+    events-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8000"
 
   serversTransports:
     # Transport for services with self-signed certificates

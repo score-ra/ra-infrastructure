@@ -216,3 +216,33 @@ endpoints:
       - type: email
     ui:
       hide-hostname: true
+
+  # --------------------------------------------------------------------------
+  # LIFE TRACKER SERVICES (ra-life-tracker)
+  # --------------------------------------------------------------------------
+
+  - name: Family Contacts (External)
+    group: External Access
+    url: "https://family.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302, 403)"
+      - "[RESPONSE_TIME] < 10000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
+
+  - name: Daily Event Log (External)
+    group: External Access
+    url: "https://events.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302, 403, 502)"
+      - "[RESPONSE_TIME] < 10000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    alerts:
+      - type: email
+    ui:
+      hide-hostname: true
