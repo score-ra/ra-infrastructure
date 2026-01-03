@@ -10,12 +10,12 @@
 
 http:
   routers:
-    # Homarr Dashboard
-    homarr-router:
+    # Selfwize Dashboard (static, config-driven)
+    dashboard-router:
       rule: "Host(`dash.selfwize.com`)"
       entryPoints:
         - web
-      service: homarr-service
+      service: dashboard-service
       middlewares:
         - cloudflare-headers
 
@@ -83,11 +83,11 @@ http:
         - cloudflare-headers
 
   services:
-    # Homarr (Docker container on port 7575)
-    homarr-service:
+    # Selfwize Dashboard (Docker container on port 8088)
+    dashboard-service:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:7575"
+          - url: "http://host.docker.internal:8088"
 
     # Gatus (Docker container on port 8083)
     gatus-service:

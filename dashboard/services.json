@@ -1,0 +1,89 @@
+{
+    "title": "Selfwize",
+    "groups": [
+        {
+            "id": "home",
+            "name": "Home",
+            "icon": "home",
+            "services": [
+                {
+                    "name": "Homeseer",
+                    "description": "Home automation controller",
+                    "url": "https://home.selfwize.com",
+                    "icon": "home",
+                    "color": "cyan"
+                },
+                {
+                    "name": "Blue Iris",
+                    "description": "Security cameras",
+                    "url": "https://cameras.selfwize.com",
+                    "icon": "camera",
+                    "color": "blue"
+                }
+            ]
+        },
+        {
+            "id": "personal",
+            "name": "Personal",
+            "icon": "notes",
+            "services": [
+                {
+                    "name": "Asset Inventory",
+                    "description": "Snipe-IT asset management",
+                    "url": "https://stuff.selfwize.com",
+                    "icon": "inventory",
+                    "color": "green"
+                },
+                {
+                    "name": "Health Records",
+                    "description": "Fasten Health",
+                    "url": "https://wellness.selfwize.com",
+                    "icon": "health",
+                    "color": "pink"
+                },
+                {
+                    "name": "Family Contacts",
+                    "description": "Gramps Web genealogy",
+                    "url": "https://family.selfwize.com",
+                    "icon": "family",
+                    "color": "purple"
+                },
+                {
+                    "name": "Daily Events",
+                    "description": "Event log tracker",
+                    "url": "https://events.selfwize.com",
+                    "icon": "calendar",
+                    "color": "amber"
+                }
+            ]
+        },
+        {
+            "id": "infra",
+            "name": "Infrastructure",
+            "icon": "server",
+            "services": [
+                {
+                    "name": "Database Admin",
+                    "description": "pgAdmin PostgreSQL",
+                    "url": "http://localhost:5050",
+                    "icon": "database",
+                    "color": "blue"
+                },
+                {
+                    "name": "Reverse Proxy",
+                    "description": "Traefik dashboard",
+                    "url": "http://localhost:8080",
+                    "icon": "proxy",
+                    "color": "cyan"
+                },
+                {
+                    "name": "Status Monitor",
+                    "description": "Gatus service health",
+                    "url": "https://status.selfwize.com",
+                    "icon": "status",
+                    "color": "green"
+                }
+            ]
+        }
+    ]
+}

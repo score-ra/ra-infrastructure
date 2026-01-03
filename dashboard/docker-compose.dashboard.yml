@@ -1,0 +1,36 @@
+# Selfwize Dashboard - Static file server
+# Lightweight nginx container serving the config-driven dashboard
+#
+# Quick Start:
+#   cd dashboard && docker-compose -f docker-compose.dashboard.yml up -d
+#
+# Access: https://dash.selfwize.com (via Cloudflare Tunnel + Traefik)
+# Local:  http://localhost:8088
+
+services:
+  dashboard:
+    image: nginx:alpine
+    container_name: selfwize-dashboard
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./styles.css:/usr/share/nginx/html/styles.css:ro
+      - ./app.js:/usr/share/nginx/html/app.js:ro
+      - ./services.json:/usr/share/nginx/html/services.json:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - inventory_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 32M
+        reservations:
+          cpus: '0.05'
+          memory: 16M
+
+networks:
+  inventory_network:
+    external: true

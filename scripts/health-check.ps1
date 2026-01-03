@@ -259,11 +259,11 @@ $script:Containers = @(
         HttpCheck   = "http://localhost:8083/health"
     },
     @{
-        Name        = "homarr"
-        DisplayName = "Homarr Dashboard"
+        Name        = "selfwize-dashboard"
+        DisplayName = "Selfwize Dashboard"
         Critical    = $false
         HasHealth   = $false
-        HttpCheck   = "http://localhost:7575"
+        HttpCheck   = "http://localhost:8088"
     },
     @{
         Name        = "inventory-pgadmin"

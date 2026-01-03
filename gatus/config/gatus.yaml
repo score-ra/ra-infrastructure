@@ -119,12 +119,12 @@ endpoints:
     ui:
       hide-hostname: true
 
-  - name: Homarr Dashboard (External)
+  - name: Selfwize Dashboard (External)
     group: External Access
     url: "https://dash.selfwize.com"
     interval: 60s
     conditions:
-      - "[STATUS] == any(200, 302, 307)"
+      - "[STATUS] == any(200, 302, 403)"
       - "[RESPONSE_TIME] < 10000"
       - "[CERTIFICATE_EXPIRATION] > 168h"
     alerts:
