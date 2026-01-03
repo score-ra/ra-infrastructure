@@ -51,8 +51,16 @@ inv org list
 
 ```
 ra-infrastructure/
+├── dashboard/                  # Selfwize Dashboard (service launcher)
+│   ├── services.json           # Service definitions (edit this!)
+│   └── docker-compose.dashboard.yml
 ├── docker/
-│   └── docker-compose.yml      # PostgreSQL + pgAdmin
+│   └── docker-compose.yml      # PostgreSQL + pgAdmin + MySQL
+├── traefik/                    # Reverse proxy configuration
+│   ├── docker-compose.traefik.yml
+│   └── dynamic/                # Dynamic route configs
+├── gatus/                      # Status monitoring
+│   └── docker-compose.gatus.yml
 ├── database/
 │   ├── migrations/             # SQL migration files (versioned)
 │   ├── seeds/                  # Initial/sample data
@@ -63,10 +71,13 @@ ra-infrastructure/
 │       ├── commands/           # CLI command groups
 │       ├── db/                 # Database access
 │       └── models/             # Data models
-├── api/                        # REST API (future)
-│   └── node/
+├── scripts/                    # Utility scripts
+│   ├── health-check.ps1        # Infrastructure health check
+│   └── backup.ps1              # Backup script
 └── docs/
-    └── schema.md               # Database documentation
+    ├── guides/                 # How-to guides
+    ├── prds/                   # Product requirements
+    └── architecture/           # Architecture docs
 ```
 
 ## CLI Commands (MVP)
@@ -122,6 +133,33 @@ inv db schema -f html
 # Open docs/schema/index.html in a browser
 ```
 
+## Web Services
+
+All services are accessible via the **Selfwize Dashboard** at https://dash.selfwize.com
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Dashboard** | https://dash.selfwize.com | Service launcher (config-driven) |
+| **Status Monitor** | https://status.selfwize.com | Gatus health monitoring |
+| **Asset Inventory** | https://stuff.selfwize.com | Snipe-IT asset management |
+| **Health Records** | https://wellness.selfwize.com | Fasten Health |
+| **Family Contacts** | https://family.selfwize.com | Gramps Web genealogy |
+| **Daily Events** | https://events.selfwize.com | Event log tracker |
+| **Home Automation** | https://home.selfwize.com | Homeseer |
+| **Security Cameras** | https://cameras.selfwize.com | Blue Iris |
+
+### Infrastructure Services (Local Only)
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| pgAdmin | http://localhost:5050 | PostgreSQL admin |
+| Traefik | http://localhost:8080 | Reverse proxy dashboard |
+| Gatus | http://localhost:8083 | Status monitor (local) |
+
+### Adding Services to Dashboard
+
+Edit `dashboard/services.json` - no code changes required. See [Dashboard README](dashboard/README.md) for details.
+
 ## Database Access
 
 - **PostgreSQL**: `localhost:5432`
@@ -141,6 +179,7 @@ inv db schema -f html
 ### Guides
 | Guide | Description |
 |-------|-------------|
+| [Selfwize Dashboard](dashboard/README.md) | Config-driven service launcher - add services by editing JSON |
 | [DBeaver Connection Import](docs/guides/DBEAVER-CONNECTION-IMPORT.md) | Import database connections into DBeaver for SQL access |
 | [MINIX Z100-0dB Power Recovery](docs/guides/MINIX-Z100-0dB-Power-Recovery-Guide.md) | Configure auto power-on after outage for the home automation server |
 
