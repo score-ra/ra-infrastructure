@@ -50,6 +50,7 @@ docker/data/
 
 # Database
 *.dump
+*.sql
 *.sql.gz
 
 # Secrets
@@ -78,6 +79,9 @@ traefik/.env
 
 # Homarr dashboard
 homarr/.env
+
+# Life tracker services
+docker/.env.life-tracker
 
 # Claude Code local settings (entire folder)
 .claude/
