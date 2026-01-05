@@ -7,6 +7,9 @@ Central infrastructure database for device inventory, network management, and mu
 ## Quick Start
 
 ```bash
+# Verify all infrastructure is healthy
+inv system selfcheck
+
 # Start database
 cd docker && docker-compose up -d
 
@@ -24,7 +27,8 @@ cd cli && pytest
 
 ### Always Start Here
 1. **Read** [start-here.md](start-here.md) for current context
-2. **Verify** your environment: `inv db stats`
+2. **Verify** infrastructure health: `inv system selfcheck`
+3. **Check** database status: `inv db stats`
 
 ### Always End Here
 1. **Update** [start-here.md](start-here.md) with:
@@ -76,6 +80,11 @@ ra-infrastructure/
 
 ### CLI Pattern
 ```bash
+# System commands
+inv system selfcheck                    # Comprehensive infrastructure health check
+inv system check-endpoint <url>         # Test specific endpoint
+
+# Entity commands
 inv <entity> <action> [options]
 inv device list --site primary-residence
 inv org show anand-family
@@ -109,6 +118,7 @@ mypy cli/src/
 | File | Purpose |
 |------|---------|
 | `start-here.md` | Session context - READ FIRST |
+| `docs/SELF-CHECK.md` | Infrastructure health check guide |
 | `docs/QUICKSTART.md` | Detailed setup guide |
 | `docker/docker-compose.yml` | Database infrastructure |
 | `cli/pyproject.toml` | Python dependencies |
@@ -128,13 +138,28 @@ pytest tests/test_commands/test_org.py
 
 ## Troubleshooting
 
+**Infrastructure health check:**
+```bash
+inv system selfcheck            # Comprehensive check of all services
+inv system selfcheck --verbose  # Detailed output
+```
+
 **Database connection failed:**
 ```bash
+inv db health                   # Check PostgreSQL specifically
 cd docker && docker-compose ps  # Check if running
 docker-compose up -d            # Start if needed
+```
+
+**Docker not responding:**
+```bash
+.\scripts\check-docker-health.ps1           # Check Docker status
+.\scripts\check-docker-health.ps1 -AutoRestart  # Auto-recover
 ```
 
 **CLI not found after install:**
 ```bash
 cd cli && pip install -e .      # Reinstall in editable mode
 ```
+
+**For detailed troubleshooting:** See [docs/SELF-CHECK.md](docs/SELF-CHECK.md)

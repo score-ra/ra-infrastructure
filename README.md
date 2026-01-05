@@ -104,6 +104,10 @@ inv network list --site primary-residence
 inv network create "Main WiFi" --type wifi --ssid "HomeNet"
 inv network scan --site primary-residence
 
+# System Health Checks
+inv system selfcheck               # Comprehensive infrastructure health check
+inv system check-endpoint <url>    # Check specific endpoint
+
 # Reports
 inv report devices --format csv > devices.csv
 inv report topology --site primary-residence

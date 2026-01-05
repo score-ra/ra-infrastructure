@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 
 from inventory import __version__
-from inventory.commands import db, device, network, org, site, zone
+from inventory.commands import db, device, network, org, site, system, zone
 
 # Create main app
 app = typer.Typer(
@@ -26,6 +26,7 @@ app.add_typer(device.app, name="device", help="Device management")
 app.add_typer(network.app, name="network", help="Network management")
 app.add_typer(zone.app, name="zone", help="Zone management")
 app.add_typer(db.app, name="db", help="Database operations")
+app.add_typer(system.app, name="system", help="System health checks and monitoring")
 
 
 @app.command()

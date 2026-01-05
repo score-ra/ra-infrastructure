@@ -2,13 +2,18 @@
 
 This guide explains how to monitor the ra-infrastructure database for availability and receive notifications when it goes down or recovers.
 
+**For comprehensive infrastructure monitoring:** See [SELF-CHECK.md](../SELF-CHECK.md) which covers all services including databases, Docker, external endpoints, and more.
+
 ## Quick Start
 
 ```bash
-# Check health once
+# Check all infrastructure services
+inv system selfcheck
+
+# Check PostgreSQL database only
 inv db health
 
-# Watch continuously (uses .env settings)
+# Watch database continuously (uses .env settings)
 inv db watch
 
 # Watch with custom interval
@@ -19,6 +24,7 @@ inv db watch -i 10
 
 | Command | Description |
 |---------|-------------|
+| `inv system selfcheck` | **Comprehensive check** - All infrastructure services |
 | `inv db health` | One-time health check (exit 0=healthy, 1=unhealthy) |
 | `inv db status` | Detailed status with uptime and ports |
 | `inv db watch` | Continuous monitoring with notifications |

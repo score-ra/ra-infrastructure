@@ -56,12 +56,22 @@ inv db seed
 inv db stats
 ```
 
-### 4. Explore
+### 4. Verify Installation
 
 ```powershell
+# Run comprehensive health check
+inv system selfcheck
+
 # Check system status
 inv status
 
+# Verify database
+inv db stats
+```
+
+### 5. Explore
+
+```powershell
 # List organizations
 inv org list
 
@@ -93,6 +103,11 @@ Add server connection:
 ```
 inv --help                    # Show all commands
 
+# System Health
+inv system selfcheck          # Comprehensive infrastructure health check
+inv system selfcheck -v       # Verbose output with details
+inv system check-endpoint <url>  # Test specific endpoint
+
 # Organizations
 inv org list                  # List organizations
 inv org show <slug>           # Show org details
@@ -119,6 +134,7 @@ inv network types             # List network types
 # Database
 inv db stats                  # Show record counts
 inv db tables                 # List tables
+inv db health                 # Check PostgreSQL health
 inv db migrate                # Run migrations
 inv db seed                   # Seed data
 inv db reset --yes            # Reset database
@@ -133,10 +149,27 @@ inv db reset --yes            # Reset database
 
 ## Troubleshooting
 
+### Quick Health Check
+```powershell
+# Run comprehensive check of all services
+inv system selfcheck
+
+# Check specific components
+inv db health                              # PostgreSQL only
+.\scripts\check-docker-health.ps1         # Docker daemon
+```
+
 ### Database connection failed
+- Run health check: `inv db health`
 - Ensure Docker containers are running: `docker ps`
 - Check .env file has correct credentials
-- Try: `docker-compose down && docker-compose up -d`
+- Try resetting volumes:
+  ```powershell
+  cd docker
+  docker-compose down
+  docker volume rm inventory_postgres_data
+  docker-compose up -d
+  ```
 
 ### CLI not found
 - Ensure virtual environment is activated
@@ -145,3 +178,10 @@ inv db reset --yes            # Reset database
 ### Migrations failed
 - Reset database: `inv db reset --yes`
 - Check PostgreSQL logs: `docker logs inventory-db`
+
+### Docker not responding
+```powershell
+.\scripts\check-docker-health.ps1 -AutoRestart
+```
+
+**For detailed troubleshooting:** See [docs/SELF-CHECK.md](SELF-CHECK.md)

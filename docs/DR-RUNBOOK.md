@@ -32,18 +32,21 @@ This guide explains how to recover the ra-infrastructure database if something g
 
 ---
 
-## Available Scripts
+## Available Scripts & Commands
 
-These PowerShell scripts automate common tasks:
+These commands and scripts help manage the infrastructure:
 
-| Script | What It Does |
-|--------|--------------|
-| `scripts\health-check.ps1` | Checks if everything is running properly |
-| `scripts\verify-startup.ps1` | Verifies services after computer restart |
+| Command/Script | What It Does |
+|----------------|--------------|
+| `inv system selfcheck` | **Comprehensive health check** - Verifies all infrastructure services |
+| `inv db health` | Checks if PostgreSQL database is accessible |
+| `scripts\check-docker-health.ps1` | Checks Docker daemon and can auto-restart |
 | `scripts\backup.ps1 -Type daily` | Creates a PostgreSQL backup on your local drive |
 | `scripts\backup.ps1 -Type daily -IncludeMySQL` | Backs up PostgreSQL + MySQL |
 | `scripts\backup.ps1 -Type weekly -IncludeMySQL` | Backs up both + uploads to Google Drive |
 | `scripts\restore.ps1 -BackupFile <path>` | Restores PostgreSQL from a backup file |
+
+**For detailed health check documentation:** See [SELF-CHECK.md](SELF-CHECK.md)
 
 ### Backup Locations
 
@@ -105,16 +108,16 @@ docker-compose restart postgres
 **Step 5: Verify it's working**
 
 ```powershell
+# Quick check - just this container
 docker-compose ps
+
+# Comprehensive check - all infrastructure
+inv system selfcheck
 ```
 
-**What you should see:** `inventory-db` should show "Up" and "(healthy)"
-
-```powershell
-inv db stats
-```
-
-**What you should see:** A table showing counts of organizations, sites, devices, etc.
+**What you should see:**
+- Container status shows "Up" and "(healthy)"
+- Selfcheck shows "ALL SYSTEMS OPERATIONAL" or "DEGRADED" (not "CRITICAL FAILURE")
 
 **Step 6: If it still doesn't work, check the logs**
 
@@ -126,6 +129,7 @@ This shows the last 50 lines of log messages, which might explain what went wron
 
 ### Success Checklist
 - [ ] Container status shows: `running (healthy)`
+- [ ] `inv system selfcheck` passes (all critical services operational)
 - [ ] `inv db stats` shows data counts (not an error)
 
 ---
@@ -186,14 +190,21 @@ docker-compose up -d
 **Step 6: Verify everything is working**
 
 ```powershell
+# Comprehensive infrastructure check
+inv system selfcheck
+
+# Check database specifically
 inv db stats
 ```
 
-**What you should see:** A table showing counts of organizations, sites, devices, etc.
+**What you should see:**
+- Selfcheck shows all critical services operational
+- Database stats table with counts
 
 ### Success Checklist
 - [ ] Docker Desktop whale icon is visible in system tray
 - [ ] Both containers show: `running (healthy)`
+- [ ] `inv system selfcheck` passes
 - [ ] `inv db stats` shows data counts
 
 ---

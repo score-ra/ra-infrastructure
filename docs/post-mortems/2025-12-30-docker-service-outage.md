@@ -188,25 +188,25 @@ Open Docker Desktop Settings:
 
 ### Short-Term Actions
 
-#### 3. Create Docker Health Check Script
+#### 3. Create Docker Health Check Script - IMPLEMENTED (2026-01-05)
 
-Create `scripts/check-docker-health.ps1`:
+Created `scripts/check-docker-health.ps1` with automated recovery capability.
+
+**Additionally implemented:**
+- `inv system selfcheck` - Comprehensive infrastructure health check
+- `inv db health` - PostgreSQL-specific health check
+- Full documentation: [SELF-CHECK.md](../SELF-CHECK.md)
+
+**Usage:**
 ```powershell
-# Quick Docker health check
-$dockerOk = $false
-try {
-    $result = docker ps 2>&1
-    if ($LASTEXITCODE -eq 0) { $dockerOk = $true }
-} catch {}
+# Check only
+.\scripts\check-docker-health.ps1
 
-if (-not $dockerOk) {
-    Write-Warning "Docker is not responding - attempting restart"
-    Stop-Process -Name 'Docker Desktop' -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 5
-    Start-Process 'C:\Program Files\Docker\Docker\Docker Desktop.exe'
-    Start-Sleep -Seconds 60
-    docker ps
-}
+# Check and auto-restart if unhealthy
+.\scripts\check-docker-health.ps1 -AutoRestart
+
+# Comprehensive infrastructure check
+inv system selfcheck
 ```
 
 #### 4. Add Windows Task Scheduler Watchdog
@@ -238,13 +238,22 @@ For critical services, consider running a lightweight process manager that can r
 
 ## Checklist: Post-Reboot Verification
 
-Add to operational runbook:
+**Quick method:**
+```powershell
+inv system selfcheck
+```
 
+**Manual verification steps:**
+- [ ] Run comprehensive health check: `inv system selfcheck`
 - [ ] Verify Docker daemon is responsive: `docker ps`
 - [ ] Verify all expected containers are running (11 containers)
-- [ ] Verify external endpoints are accessible
+- [ ] Verify PostgreSQL and MySQL databases are accessible
+- [ ] Verify external endpoints are accessible (*.selfwize.com)
 - [ ] Verify Gatus is showing all services healthy
 - [ ] Check `com.docker.service` is Running
+- [ ] Check cloudflared tunnel service is running
+
+**For detailed verification procedures:** See [SELF-CHECK.md](../SELF-CHECK.md)
 
 ---
 

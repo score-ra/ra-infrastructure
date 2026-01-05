@@ -4,12 +4,24 @@
 
 ---
 
+## Quick Health Check (Start Here!)
+
+```powershell
+inv system selfcheck
+```
+
+This checks **everything**: Docker, databases, external endpoints, and more.
+
+---
+
 ## What's Wrong? → What To Do
 
 | Symptom | Likely Cause | Quick Fix |
 |---------|--------------|-----------|
-| `inv db stats` shows error | Container stopped | `docker-compose restart postgres` |
+| `inv system selfcheck` fails | Multiple issues | Check specific failures in output |
+| `inv db health` shows error | Container stopped | `docker-compose restart postgres` |
 | Docker whale icon missing | Docker not running | Start Docker Desktop from Start Menu |
+| External sites down (*.selfwize.com) | Cloudflare tunnel issue | Check cloudflared service |
 | Data is corrupted/deleted | Database issue | Use restore.ps1 (see below) |
 | Computer is new/rebuilt | Starting fresh | Follow Tier 4 in DR-RUNBOOK.md |
 
@@ -19,8 +31,15 @@
 
 ### Check Status
 ```powershell
+# Comprehensive check (recommended)
+inv system selfcheck
+
+# Check Docker containers
 cd c:\Users\ranand\workspace\personal\software\ra-infrastructure\docker
 docker-compose ps
+
+# Check database
+inv db health
 inv db stats
 ```
 
@@ -78,4 +97,8 @@ dir D:\Backups\homeautomation-mysql\daily\ | Sort-Object LastWriteTime -Descendi
 
 ## Full Documentation
 
-For detailed step-by-step instructions, see: [DR-RUNBOOK.md](DR-RUNBOOK.md)
+| Document | Purpose |
+|----------|---------|
+| [SELF-CHECK.md](SELF-CHECK.md) | Comprehensive health check guide |
+| [DR-RUNBOOK.md](DR-RUNBOOK.md) | Detailed disaster recovery procedures |
+| [database-monitoring.md](guides/database-monitoring.md) | Database-specific monitoring |

@@ -196,6 +196,9 @@ See **[docs/DATABASE.md](docs/DATABASE.md)** for:
 ## Quick Commands
 
 ```powershell
+# Infrastructure self-check (all services)
+inv system selfcheck
+
 # Start database
 cd docker && docker-compose up -d
 
@@ -243,6 +246,7 @@ docker stop traefik homarr ra-status
 
 | Document | Purpose |
 |----------|---------|
+| [docs/SELF-CHECK.md](docs/SELF-CHECK.md) | **Infrastructure health check guide** |
 | [docs/DATABASE.md](docs/DATABASE.md) | **External repository integration guide** |
 | [docs/DR-RUNBOOK.md](docs/DR-RUNBOOK.md) | **Disaster recovery procedures** |
 | [docs/RECOVERY-QUICKSTART.md](docs/RECOVERY-QUICKSTART.md) | One-page recovery reference |
