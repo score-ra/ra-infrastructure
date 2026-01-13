@@ -7,10 +7,39 @@
 | Field | Value |
 |-------|-------|
 | **Phase** | Operations Ready |
-| **Last Updated** | 2025-12-30 |
+| **Last Updated** | 2026-01-13 |
 | **Purpose** | Central infrastructure database for other repositories |
 
-## Session Context (2025-12-30)
+## Session Context (2026-01-13)
+
+### Dashboard Health Check Fix - COMPLETED
+
+**Issue:** `inv system selfcheck` was reporting "0/9 services" for the Selfwize Dashboard despite it being healthy.
+
+**Root Cause:** Two issues with `_check_selfwize_dashboard()`:
+1. Dashboard is behind **Cloudflare Access** - returns 302 redirect to login page
+2. Dashboard is **JS-rendered** - service names loaded dynamically from `services.json`, not present in raw HTML
+
+**Resolution:** Updated the health check to:
+1. Check external reachability via `dash.selfwize.com` (302 redirect is OK)
+2. Verify service content via local `localhost:8088/services.json`
+
+**Files Modified:**
+- `cli/src/inventory/commands/system.py` - Fixed `_check_selfwize_dashboard()` function
+
+**Commit:** `de753ce` - Fix dashboard health check for Cloudflare Access protected endpoint
+
+**Verification:**
+```
+inv system selfcheck
+# Dashboard now shows: OK  reachable, 9/9 services (215ms)
+```
+
+**Remaining Warning:** Blue Iris HTTP 401 is expected (requires authentication).
+
+---
+
+## Previous Session Context (2025-12-30)
 
 ### Docker Service Outage - RESOLVED
 
@@ -182,7 +211,7 @@ See **[docs/DATABASE.md](docs/DATABASE.md)** for:
 | MySQL | `localhost:3306` |
 | pgAdmin | `localhost:5050` |
 | **Traefik** | `localhost:80` (tunnel), `localhost:8080` (dashboard) |
-| **Homarr** | `https://dash.selfwize.com` or `localhost:7575` |
+| **Selfwize Dashboard** | `https://dash.selfwize.com` or `localhost:8088` |
 | **Gatus Dashboard** | `https://status.selfwize.com` or `localhost:8083` |
 | Database (PostgreSQL) | `inventory` |
 | Database (MySQL) | `homeautomation` |
