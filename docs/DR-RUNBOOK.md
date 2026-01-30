@@ -20,6 +20,20 @@ This guide explains how to recover the ra-infrastructure database if something g
 
 ---
 
+## Service Tiers
+
+Services are prioritized by criticality for recovery:
+
+| Tier | Services | Recovery Priority | Notes |
+|------|----------|-------------------|-------|
+| **Tier 1 - Critical** | PostgreSQL, MySQL, Cloudflare Tunnel | Immediate | Core data and external access |
+| **Tier 2 - Important** | Traefik, Gatus, Fasten Health | Within 4 hours | Routing and health monitoring |
+| **Tier 3 - Optional** | pgAdmin, Dashboard, Homarr | Within 24 hours | Admin interfaces, can function without |
+
+**Recovery order:** Always restore Tier 1 services first, then Tier 2, then Tier 3.
+
+---
+
 ## Quick Reference
 
 | What Happened | How Long to Fix | What to Do |
@@ -326,6 +340,79 @@ inv device list
 - [ ] All containers running and healthy
 - [ ] `inv db stats` shows expected record counts
 - [ ] Data queries return expected results
+
+---
+
+## Fasten Health Recovery
+
+**When to use:** Fasten Health database is corrupted, config lost, or needs to be restored
+
+**Time estimate:** 20 minutes
+
+**CRITICAL:** The encryption key is required to decrypt health data. Without it, the database is unreadable.
+
+### Steps
+
+**Step 1: Stop the Fasten container**
+
+```powershell
+docker compose -f C:\Users\ranand\workspace\personal\software\fasten-deploy\docker-compose.yml stop
+```
+
+**Step 2: Find your Fasten backup**
+
+```powershell
+dir D:\Backups\fasten-health\ | Sort-Object LastWriteTime -Descending
+```
+
+Look for files like `fasten-health_2025-01-15.zip`
+
+**Step 3: Extract the backup**
+
+```powershell
+# Create temp restore folder
+New-Item -Path "C:\temp\fasten-restore" -ItemType Directory -Force
+
+# Extract backup
+Expand-Archive -Path "D:\Backups\fasten-health\fasten-health_YYYY-MM-DD.zip" -DestinationPath "C:\temp\fasten-restore" -Force
+```
+
+**Step 4: Restore database files**
+
+```powershell
+# Restore SQLite database
+Copy-Item "C:\temp\fasten-restore\db\*" "C:\Users\ranand\workspace\personal\software\fasten-deploy\db\" -Force
+```
+
+**Step 5: Restore certificates (if needed)**
+
+```powershell
+Copy-Item "C:\temp\fasten-restore\certs\*" "C:\Users\ranand\workspace\personal\software\fasten-deploy\certs\" -Force
+```
+
+**Step 6: Restore encryption key (CRITICAL)**
+
+```powershell
+Copy-Item "C:\temp\fasten-restore\encryption_key.txt" "C:\Users\ranand\workspace\personal\software\ra-fasten-health\config\" -Force
+```
+
+**Step 7: Start Fasten container**
+
+```powershell
+docker compose -f C:\Users\ranand\workspace\personal\software\fasten-deploy\docker-compose.yml start
+```
+
+**Step 8: Verify**
+
+1. Open Fasten in browser
+2. Log in with your credentials
+3. Verify health records are visible
+
+### Success Checklist
+- [ ] Fasten container is running
+- [ ] Can log in to Fasten web UI
+- [ ] Health records are visible and decrypted
+- [ ] Cleanup temp restore folder: `Remove-Item C:\temp\fasten-restore -Recurse`
 
 ---
 

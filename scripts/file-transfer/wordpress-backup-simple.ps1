@@ -14,13 +14,29 @@ try {
     exit 1
 }
 
-# Load configuration
-$envConfig = @{
-    DEPLOY_HOST = "131.153.239.36"
-    DEPLOY_PORT = "21"
-    DEPLOY_USER = "symphonyftp@xgz41he329.wpdns.site"
-    DEPLOY_PASSWORD = "vj36Z8XWH@3K"
-    SITE_URL = "https://xgz41he329.wpdns.site"
+# Load configuration from env file
+$configFile = Join-Path $PSScriptRoot "..\..\config\wordpress-ftp.env"
+$envConfig = @{}
+
+if (Test-Path $configFile) {
+    Get-Content $configFile | ForEach-Object {
+        if ($_ -match "^([^#=]+)=(.*)$") {
+            $envConfig[$Matches[1].Trim()] = $Matches[2].Trim()
+        }
+    }
+} else {
+    Write-Error "Configuration file not found: $configFile"
+    Write-Error "Copy config/wordpress-ftp.env.template to config/wordpress-ftp.env and fill in values"
+    exit 1
+}
+
+# Validate required config values
+$requiredKeys = @("DEPLOY_HOST", "DEPLOY_PORT", "DEPLOY_USER", "DEPLOY_PASSWORD", "SITE_URL")
+foreach ($key in $requiredKeys) {
+    if (-not $envConfig.ContainsKey($key) -or [string]::IsNullOrWhiteSpace($envConfig[$key])) {
+        Write-Error "Missing required configuration: $key"
+        exit 1
+    }
 }
 
 # Create backup directory

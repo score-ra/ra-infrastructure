@@ -70,6 +70,7 @@ logs/
 config/monitoring.env
 config/rclone.conf
 config/cloudflare.env
+config/wordpress-ftp.env
 
 # Gatus monitoring (contains SMTP credentials)
 gatus/.env

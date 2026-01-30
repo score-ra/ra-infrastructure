@@ -91,8 +91,23 @@ $script:RcloneRemotePath = "ra-infrastructure-backup"
 $script:MySqlContainer = "homeautomation-db"
 $script:MySqlDatabase = "homeautomation"
 $script:MySqlUser = "homeautomation"
-$script:MySqlPassword = "homeautomation_dev_password"
 $script:MySqlBackupDir = "D:\Backups\homeautomation-mysql"
+
+# Load MySQL password from environment or .env file
+$script:MySqlPassword = $env:MYSQL_PASSWORD
+if (-not $script:MySqlPassword) {
+    $envFile = Join-Path $script:RepoRoot ".env"
+    if (Test-Path $envFile) {
+        Get-Content $envFile | ForEach-Object {
+            if ($_ -match "^MYSQL_PASSWORD=(.+)$") {
+                $script:MySqlPassword = $Matches[1]
+            }
+        }
+    }
+}
+if (-not $script:MySqlPassword) {
+    $script:MySqlPassword = "homeautomation_dev_password"  # Development fallback
+}
 
 # Fasten Health settings
 $script:FastenDeployDir = "C:\Users\ranand\workspace\personal\software\fasten-deploy"
