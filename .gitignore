@@ -63,6 +63,9 @@ secrets/
 htmlcov/
 .pytest_cache/
 
+# Linting cache
+.ruff_cache/
+
 # Logs directory
 logs/
 
@@ -86,6 +89,9 @@ docker/.env.life-tracker
 
 # Claude Code local settings (entire folder)
 .claude/
+
+# Claude Code temporary files
+tmpclaude-*
 
 # Windows artifacts
 nul
