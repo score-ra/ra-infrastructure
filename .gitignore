@@ -75,6 +75,10 @@ config/rclone.conf
 config/cloudflare.env
 config/wordpress-ftp.env
 
+# Infrastructure config is git-tracked (no secrets)
+!config/infrastructure.env
+!config/infrastructure.env.example
+
 # Gatus monitoring (contains SMTP credentials)
 gatus/.env
 

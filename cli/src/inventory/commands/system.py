@@ -8,16 +8,16 @@ Cloudflare tunnel endpoints, and the Selfwize dashboard.
 
 import subprocess
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import List, Tuple
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
 
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
-from inventory.config import get_settings
+from inventory.config import get_infra_config
 from inventory.db.connection import get_connection
 
 app = typer.Typer(help="System health checks and monitoring")
@@ -77,19 +77,19 @@ def _check_postgres() -> Tuple[bool, str]:
 
 def _check_mysql() -> Tuple[bool, str]:
     """Check MySQL database connection."""
+    infra = get_infra_config()
     try:
         result = subprocess.run(
             [
                 "docker",
                 "exec",
-                "homeautomation-db",
+                infra.mysql_container,
                 "mysqladmin",
                 "ping",
                 "-h",
                 "localhost",
                 "-u",
-                "homeautomation",
-                "-phomeautomation_dev_password",
+                infra.mysql_user,
             ],
             capture_output=True,
             text=True,
@@ -189,10 +189,11 @@ def _check_selfwize_dashboard() -> Tuple[bool, str, List[str]]:
         external_ok = False
 
     # Step 2: Check local services.json for content verification
+    dash_port = get_infra_config().dashboard_port
     detected = []
     try:
         req = Request(
-            "http://localhost:8088/services.json",
+            f"http://localhost:{dash_port}/services.json",
             headers={'User-Agent': 'ra-infrastructure-healthcheck/1.0'}
         )
         response = urlopen(req, timeout=5)
@@ -262,13 +263,18 @@ def selfcheck(
         critical_failure = True
 
     # Docker containers
+    infra = get_infra_config()
     containers = [
-        ("inventory-db", "PostgreSQL", True),
-        ("homeautomation-db", "MySQL", True),
-        ("inventory-pgadmin", "pgAdmin", False),
-        ("traefik", "Traefik", False),
-        ("ra-status", "Gatus", False),
-        ("selfwize-dashboard", "Dashboard", False),
+        (infra.postgres_container, "PostgreSQL", True),
+        (infra.mysql_container, "MySQL", True),
+        (infra.pgadmin_container, "pgAdmin", False),
+        (infra.traefik_container, "Traefik", False),
+        (infra.gatus_container, "Gatus", False),
+        (infra.dashboard_container, "Dashboard", False),
+        (infra.snipeit_container, "Snipe-IT", False),
+        (infra.fasten_container, "Fasten Health", False),
+        (infra.eventlog_container, "Event Log", False),
+        (infra.eventlog_db_container, "Event Log DB", False),
     ]
 
     for container_name, display_name, is_critical in containers:

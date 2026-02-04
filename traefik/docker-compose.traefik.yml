@@ -1,3 +1,6 @@
+# DEPRECATED: Use root docker-compose.yml instead (service: ra_traefik)
+# This standalone file is kept for reference only.
+#
 # Traefik Reverse Proxy for ra-infrastructure
 # PRD: docs/prds/PRD-008-reverse-proxy-infrastructure.md
 #

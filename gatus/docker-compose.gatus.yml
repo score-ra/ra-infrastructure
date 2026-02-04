@@ -1,3 +1,6 @@
+# DEPRECATED: Use root docker-compose.yml instead (service: ra_gatus)
+# This standalone file is kept for reference only.
+#
 # Gatus Service Status Monitoring for ra-infrastructure
 # PRD: docs/prds/PRD-007-service-monitoring-dashboard.md
 #

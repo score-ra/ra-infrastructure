@@ -169,6 +169,7 @@ services:
       - ra_fasten_db:/opt/fasten/db
       - ra_fasten_cache:/opt/fasten/cache
       - ra_fasten_certs:/opt/fasten/certs/shared
+      - ./fasten/config.yaml:/opt/fasten/config/config.yaml:ro
     networks:
       - ra_network
     deploy:

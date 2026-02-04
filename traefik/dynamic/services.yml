@@ -59,19 +59,18 @@ http:
         servers:
           - url: "http://ra_snipeit:80"
 
-    # Fasten Health: internal container on ra_network (uses self-signed HTTPS)
+    # Fasten Health: internal container on ra_network
     wellness-selfwize-service:
       loadBalancer:
         servers:
-          - url: "https://ra_fasten:8080"
-        serversTransport: insecureTransport
+          - url: "http://ra_fasten:8080"
 
     # Blue Iris: external on old PC (self-signed cert)
     cameras-selfwize-service:
       loadBalancer:
         servers:
           - url: "https://192.168.68.56:443"
-        serversTransport: insecureTransport
+        serversTransport: insecureTransport@file
 
     # Gatus: internal container on ra_network
     status-selfwize-service:

@@ -40,7 +40,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $script:RepoRoot = Split-Path -Parent $PSScriptRoot
-$script:DockerComposePath = Join-Path $RepoRoot "docker\docker-compose.yml"
+
+# Load centralized infrastructure config
+. "$PSScriptRoot\Load-InfraConfig.ps1"
+
+$script:DockerComposePath = Join-Path $RepoRoot $env:RA_COMPOSE_FILE
 $script:LogDir = Join-Path $script:RepoRoot "logs"
 $script:LogFile = Join-Path $script:LogDir "startup.log"
 $script:ConfigFile = Join-Path $script:RepoRoot "config\monitoring.env"
@@ -234,7 +238,7 @@ function Test-DockerContainers {
     }
 
     # Check health status
-    $health = docker inspect --format='{{.State.Health.Status}}' inventory-db 2>&1
+    $health = docker inspect --format='{{.State.Health.Status}}' $env:RA_POSTGRES_CONTAINER 2>&1
     if ($health -ne "healthy") {
         Write-Status "PostgreSQL container not healthy (status: $health), waiting..." -Type Warning
         return Wait-ForPostgres
@@ -264,7 +268,7 @@ function Wait-ForPostgres {
     $attempt = 0
 
     while ($attempt -lt $maxAttempts) {
-        $health = docker inspect --format='{{.State.Health.Status}}' inventory-db 2>&1
+        $health = docker inspect --format='{{.State.Health.Status}}' $env:RA_POSTGRES_CONTAINER 2>&1
 
         if ($health -eq "healthy") {
             Write-Status "PostgreSQL is ready" -Type Success

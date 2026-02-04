@@ -37,14 +37,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 $script:RepoRoot = Split-Path -Parent $PSScriptRoot
+
+# Load centralized infrastructure config
+. "$PSScriptRoot\Load-InfraConfig.ps1"
+
 $script:LogDir = Join-Path $script:RepoRoot "logs"
 $script:LogFile = Join-Path $script:LogDir "restore.log"
-$script:DockerComposePath = Join-Path $script:RepoRoot "docker\docker-compose.yml"
+$script:DockerComposePath = Join-Path $script:RepoRoot $env:RA_COMPOSE_FILE
 
-# Database settings
-$script:DbContainer = "inventory-db"
-$script:DbName = "inventory"
-$script:DbUser = "inventory"
+# Database settings (from infrastructure config)
+$script:DbContainer = $env:RA_POSTGRES_CONTAINER
+$script:DbName = $env:RA_POSTGRES_DB
+$script:DbUser = $env:RA_POSTGRES_USER
 
 # Ensure logs directory exists
 if (-not (Test-Path $script:LogDir)) {
@@ -219,7 +223,7 @@ function Stop-DependentServices {
 
     try {
         # Stop pgAdmin (if running)
-        docker stop inventory-pgadmin 2>&1 | Out-Null
+        docker stop ra_pgadmin 2>&1 | Out-Null
         Write-Log "Stopped pgAdmin" -Level INFO
     }
     catch {

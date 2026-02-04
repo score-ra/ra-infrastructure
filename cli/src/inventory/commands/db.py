@@ -14,22 +14,22 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from inventory.config import get_settings
+from inventory.config import get_infra_config, get_settings
 from inventory.db.connection import get_connection
 
 app = typer.Typer(help="Database operations")
 console = Console()
 
-# Container configuration
-CONTAINER_NAME = "inventory-db"
-DOCKER_COMPOSE_DIR = "docker"
+
+def _container_name() -> str:
+    return get_infra_config().postgres_container
 
 
 def _get_container_status() -> dict:
     """Get the status of the database container."""
     try:
         result = subprocess.run(
-            ["docker", "inspect", "--format", "{{.State.Status}}", CONTAINER_NAME],
+            ["docker", "inspect", "--format", "{{.State.Status}}", _container_name()],
             capture_output=True,
             text=True,
             timeout=10,
@@ -78,7 +78,7 @@ def _is_healthy() -> tuple[bool, str]:
     """Check if database is healthy. Returns (is_healthy, reason)."""
     container = _get_container_status()
     if not container["running"]:
-        return False, f"Container {CONTAINER_NAME} is {container['status']}"
+        return False, f"Container {_container_name()} is {container['status']}"
 
     db = _test_db_connection()
     if not db["connected"]:
@@ -135,7 +135,8 @@ def health():
     container = _get_container_status()
     container_status = container["status"]
     container_style = "green" if container["running"] else "red"
-    console.print(f"Container:  {CONTAINER_NAME} [[{container_style}]{container_status}[/{container_style}]]")
+    name = _container_name()
+    console.print(f"Container:  {name} [[{container_style}]{container_status}[/{container_style}]]")
 
     # Check database connection
     if container["running"]:
@@ -170,7 +171,7 @@ def status():
     table.add_column("Property", style="cyan")
     table.add_column("Value")
 
-    table.add_row("Container", CONTAINER_NAME)
+    table.add_row("Container", _container_name())
     status_style = "green" if container["running"] else "red"
     table.add_row("State", f"[{status_style}]{container['status']}[/{status_style}]")
 
@@ -179,7 +180,7 @@ def status():
         try:
             # Get uptime
             result = subprocess.run(
-                ["docker", "inspect", "--format", "{{.State.StartedAt}}", CONTAINER_NAME],
+                ["docker", "inspect", "--format", "{{.State.StartedAt}}", _container_name()],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -189,7 +190,7 @@ def status():
 
             # Get ports
             result = subprocess.run(
-                ["docker", "port", CONTAINER_NAME],
+                ["docker", "port", _container_name()],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -222,15 +223,15 @@ def stop(
 ):
     """Stop the database container."""
     if not yes:
-        confirm = typer.confirm(f"Stop container '{CONTAINER_NAME}'?")
+        confirm = typer.confirm(f"Stop container '{_container_name()}'?")
         if not confirm:
             raise typer.Abort()
 
-    console.print(f"Stopping {CONTAINER_NAME}...", end=" ")
+    console.print(f"Stopping {_container_name()}...", end=" ")
 
     try:
         result = subprocess.run(
-            ["docker", "stop", CONTAINER_NAME],
+            ["docker", "stop", _container_name()],
             capture_output=True,
             text=True,
             timeout=30,
@@ -249,11 +250,11 @@ def stop(
 @app.command()
 def start():
     """Start the database container."""
-    console.print(f"Starting {CONTAINER_NAME}...", end=" ")
+    console.print(f"Starting {_container_name()}...", end=" ")
 
     try:
         result = subprocess.run(
-            ["docker", "start", CONTAINER_NAME],
+            ["docker", "start", _container_name()],
             capture_output=True,
             text=True,
             timeout=30,
@@ -282,11 +283,11 @@ def start():
 @app.command()
 def restart():
     """Restart the database container."""
-    console.print(f"Restarting {CONTAINER_NAME}...", end=" ")
+    console.print(f"Restarting {_container_name()}...", end=" ")
 
     try:
         result = subprocess.run(
-            ["docker", "restart", CONTAINER_NAME],
+            ["docker", "restart", _container_name()],
             capture_output=True,
             text=True,
             timeout=60,
@@ -378,11 +379,11 @@ def watch(
             # Send notification on state change
             if state_changed:
                 if healthy:
-                    subject = f"[RECOVERED] Database {CONTAINER_NAME} is UP"
-                    body = f"Database {CONTAINER_NAME} has recovered.\n\nTime: {now}\nStatus: {reason}"
+                    subject = f"[RECOVERED] Database {_container_name()} is UP"
+                    body = f"Database {_container_name()} has recovered.\n\nTime: {now}\nStatus: {reason}"
                 else:
-                    subject = f"[ALERT] Database {CONTAINER_NAME} is DOWN"
-                    body = f"Database {CONTAINER_NAME} is down!\n\nTime: {now}\nReason: {reason}"
+                    subject = f"[ALERT] Database {_container_name()} is DOWN"
+                    body = f"Database {_container_name()} is down!\n\nTime: {now}\nReason: {reason}"
 
                 console.print(f"  [yellow]State changed: {'UP' if healthy else 'DOWN'}[/yellow]")
 
@@ -413,7 +414,7 @@ def watch(
 
                         data = json.dumps({
                             "status": "up" if healthy else "down",
-                            "container": CONTAINER_NAME,
+                            "container": _container_name(),
                             "reason": reason,
                             "timestamp": now,
                         }).encode("utf-8")
@@ -678,20 +679,21 @@ def schema(
 
     # Use SchemaSpy Docker image to generate diagram
     # SchemaSpy generates HTML documentation with ER diagrams
-    # Use Docker network to connect to inventory-db container (works on Windows/Mac/Linux)
+    # Use Docker network to connect to database container (works on Windows/Mac/Linux)
     # Note: SchemaSpy image has default -o /output, so we just mount our dir there
+    infra = get_infra_config()
     docker_cmd = [
         "docker",
         "run",
         "--rm",
-        "--network=inventory_network",  # Connect to same network as database
+        f"--network={infra.docker_network}",
         "-v",
         f"{output_dir}:/output",
         "schemaspy/schemaspy:latest",
         "-t",
         "pgsql",
         "-host",
-        "inventory-db",  # Container name on the Docker network
+        infra.postgres_container,
         "-port",
         "5432",
         "-db",

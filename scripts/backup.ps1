@@ -65,19 +65,23 @@ param(
     [switch]$FastenOnly,
     [switch]$Force,
 
-    [string]$BackupDir = "D:\Backups\ra-infrastructure"
+    [string]$BackupDir = "C:\ra-infrastructure-local-backup\inventory"
 )
 
 $ErrorActionPreference = "Stop"
 $script:RepoRoot = Split-Path -Parent $PSScriptRoot
+
+# Load centralized infrastructure config
+. "$PSScriptRoot\Load-InfraConfig.ps1"
+
 $script:LogDir = Join-Path $script:RepoRoot "logs"
 $script:LogFile = Join-Path $script:LogDir "backup.log"
 $script:ConfigFile = Join-Path $script:RepoRoot "config\monitoring.env"
 
-# Database settings
-$script:DbContainer = "inventory-db"
-$script:DbName = "inventory"
-$script:DbUser = "inventory"
+# Database settings (from infrastructure config)
+$script:DbContainer = $env:RA_POSTGRES_CONTAINER
+$script:DbName = $env:RA_POSTGRES_DB
+$script:DbUser = $env:RA_POSTGRES_USER
 
 # Retention settings (6 months)
 $script:DailyRetentionDays = 30      # ~1 month of daily backups locally
@@ -87,33 +91,46 @@ $script:WeeklyRetentionWeeks = 26    # 6 months of weekly backups on Google Driv
 $script:RcloneRemote = "gdrive"
 $script:RcloneRemotePath = "ra-infrastructure-backup"
 
-# MySQL (home automation) settings
-$script:MySqlContainer = "homeautomation-db"
-$script:MySqlDatabase = "homeautomation"
-$script:MySqlUser = "homeautomation"
-$script:MySqlBackupDir = "D:\Backups\homeautomation-mysql"
+# MySQL (Snipe-IT) settings (from infrastructure config)
+$script:MySqlContainer = $env:RA_MYSQL_CONTAINER
+$script:MySqlDatabase = $env:RA_MYSQL_DB
+$script:MySqlUser = $env:RA_MYSQL_USER
+$script:MySqlBackupDir = $env:RA_MYSQL_BACKUP_DIR
 
 # Load MySQL password from environment or .env file
-$script:MySqlPassword = $env:MYSQL_PASSWORD
+$script:MySqlPassword = $env:SNIPEIT_DB_PASSWORD
 if (-not $script:MySqlPassword) {
     $envFile = Join-Path $script:RepoRoot ".env"
     if (Test-Path $envFile) {
         Get-Content $envFile | ForEach-Object {
-            if ($_ -match "^MYSQL_PASSWORD=(.+)$") {
+            if ($_ -match "^SNIPEIT_DB_PASSWORD=(.+)$") {
                 $script:MySqlPassword = $Matches[1]
             }
         }
     }
 }
 if (-not $script:MySqlPassword) {
-    $script:MySqlPassword = "homeautomation_dev_password"  # Development fallback
+    Write-Host "[!] SNIPEIT_DB_PASSWORD not found in environment or .env file" -ForegroundColor Yellow
 }
 
-# Fasten Health settings
-$script:FastenDeployDir = "C:\Users\ranand\workspace\personal\software\fasten-deploy"
-$script:FastenHealthDir = "C:\Users\ranand\workspace\personal\software\ra-fasten-health"
-$script:FastenBackupDir = "D:\Backups\fasten-health"
-$script:FastenContainer = "fasten-deploy-fasten-prod-1"
+# Load MySQL root password for verification
+$script:MySqlRootPassword = $env:MYSQL_ROOT_PASSWORD
+if (-not $script:MySqlRootPassword) {
+    $envFile = Join-Path $script:RepoRoot ".env"
+    if (Test-Path $envFile) {
+        Get-Content $envFile | ForEach-Object {
+            if ($_ -match "^MYSQL_ROOT_PASSWORD=(.+)$") {
+                $script:MySqlRootPassword = $Matches[1]
+            }
+        }
+    }
+}
+
+# Fasten Health settings (from infrastructure config)
+$script:FastenContainer = $env:RA_FASTEN_CONTAINER
+$script:FastenBackupDir = $env:RA_FASTEN_BACKUP_DIR
+$script:FastenDbPath = "/opt/fasten/db"
+$script:FastenCertsPath = "/opt/fasten/certs/shared"
 
 # Find rclone in common locations and add to PATH if needed
 function Find-Rclone {
@@ -679,12 +696,12 @@ function Test-MySqlBackupIntegrity {
         # Try to parse the SQL (dry run) - check syntax without executing
         # Use mysql with --execute to parse but we create/drop a temp db
         # Use cmd /c to suppress PowerShell treating MySQL warnings as errors
-        cmd /c "docker exec $script:MySqlContainer mysql -u root -pmysql_root_dev_password -e `"DROP DATABASE IF EXISTS verify_backup_temp; CREATE DATABASE verify_backup_temp;`" 2>nul"
-        cmd /c "docker exec $script:MySqlContainer mysql -u root -pmysql_root_dev_password verify_backup_temp -e `"SOURCE $containerDumpPath;`" 2>nul"
+        cmd /c "docker exec $script:MySqlContainer mysql -u root -p$($script:MySqlRootPassword) -e `"DROP DATABASE IF EXISTS verify_backup_temp; CREATE DATABASE verify_backup_temp;`" 2>nul"
+        cmd /c "docker exec $script:MySqlContainer mysql -u root -p$($script:MySqlRootPassword) verify_backup_temp -e `"SOURCE $containerDumpPath;`" 2>nul"
         $exitCode = $LASTEXITCODE
 
         # Cleanup
-        cmd /c "docker exec $script:MySqlContainer mysql -u root -pmysql_root_dev_password -e `"DROP DATABASE IF EXISTS verify_backup_temp;`" 2>nul"
+        cmd /c "docker exec $script:MySqlContainer mysql -u root -p$($script:MySqlRootPassword) -e `"DROP DATABASE IF EXISTS verify_backup_temp;`" 2>nul"
         docker exec $script:MySqlContainer rm -f $containerGzPath $containerDumpPath 2>&1 | Out-Null
 
         if ($exitCode -eq 0) {
@@ -700,7 +717,7 @@ function Test-MySqlBackupIntegrity {
         Write-Log "MySQL verification failed: $_" -Level ERROR
 
         # Cleanup on error
-        cmd /c "docker exec $script:MySqlContainer mysql -u root -pmysql_root_dev_password -e `"DROP DATABASE IF EXISTS verify_backup_temp;`" 2>nul"
+        cmd /c "docker exec $script:MySqlContainer mysql -u root -p$($script:MySqlRootPassword) -e `"DROP DATABASE IF EXISTS verify_backup_temp;`" 2>nul"
         docker exec $script:MySqlContainer rm -f $containerGzPath $containerDumpPath 2>&1 | Out-Null
 
         return $false
@@ -828,24 +845,31 @@ function Invoke-MySqlWeeklyBackup {
 function Test-FastenPrerequisites {
     Write-Log "Checking Fasten Health prerequisites..." -Level INFO
 
-    # Check if Fasten deploy directory exists
-    if (-not (Test-Path $script:FastenDeployDir)) {
-        Write-Log "Fasten deploy directory not found: $script:FastenDeployDir" -Level ERROR
+    # Check Docker is running
+    try {
+        docker info 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Docker is not running" -Level ERROR
+            return $false
+        }
+    }
+    catch {
+        Write-Log "Docker is not installed or not in PATH" -Level ERROR
         return $false
     }
 
-    # Check if Fasten database exists
-    $fastenDb = Join-Path $script:FastenDeployDir "db\fasten.db"
-    if (-not (Test-Path $fastenDb)) {
-        Write-Log "Fasten database not found: $fastenDb" -Level ERROR
+    # Check container is running
+    $state = docker inspect --format='{{.State.Running}}' $script:FastenContainer 2>&1
+    if ($LASTEXITCODE -ne 0 -or $state -ne "true") {
+        Write-Log "Container '$script:FastenContainer' is not running" -Level ERROR
         return $false
     }
 
-    # Check if encryption key exists
-    $encryptionKey = Join-Path $script:FastenHealthDir "config\encryption_key.txt"
-    if (-not (Test-Path $encryptionKey)) {
-        Write-Log "Fasten encryption key not found: $encryptionKey" -Level WARNING
-        # Continue anyway - key might be stored elsewhere
+    # Verify database exists inside container
+    $dbCheck = docker exec $script:FastenContainer test -f "$($script:FastenDbPath)/fasten.db" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Log "Fasten database not found inside container at $($script:FastenDbPath)/fasten.db" -Level ERROR
+        return $false
     }
 
     # Check backup directory
@@ -872,67 +896,51 @@ function New-FastenBackup {
 
     try {
         $startTime = Get-Date
+        $composeFile = Join-Path $script:RepoRoot "docker-compose.yml"
 
-        # Optionally stop container for consistent backup
+        # Optionally stop container for consistent SQLite backup
         $containerWasRunning = $false
         if ($StopContainer) {
             $state = docker inspect --format='{{.State.Running}}' $script:FastenContainer 2>&1
             if ($LASTEXITCODE -eq 0 -and $state -eq "true") {
                 $containerWasRunning = $true
                 Write-Log "Stopping Fasten container for consistent backup..." -Level INFO
-                docker compose -f "$script:FastenDeployDir\docker-compose.yml" stop 2>&1 | Out-Null
+                docker compose -f $composeFile stop ra_fasten 2>&1 | Out-Null
                 Start-Sleep -Seconds 2
             }
         }
 
-        # Backup database (CRITICAL)
-        Write-Log "Backing up Fasten database..." -Level INFO
+        # Backup database from Docker volume (CRITICAL)
+        Write-Log "Backing up Fasten database from container volume..." -Level INFO
         $dbBackupDir = Join-Path $backupDir "db"
         New-Item -ItemType Directory -Force -Path $dbBackupDir | Out-Null
-        $dbFiles = Get-ChildItem -Path "$script:FastenDeployDir\db" -ErrorAction SilentlyContinue
-        if ($dbFiles) {
-            Copy-Item -Path "$script:FastenDeployDir\db\*" -Destination $dbBackupDir -Force
-            $dbSize = (Get-ChildItem $dbBackupDir -Recurse | Measure-Object -Property Length -Sum).Sum
-            Write-Log "Database backed up: $([math]::Round($dbSize / 1MB, 2)) MB" -Level INFO
+
+        # Use a temporary container to copy from the volume when container is stopped
+        if (-not $containerWasRunning -or $StopContainer) {
+            docker run --rm -v ra-infrastructure_ra_fasten_db:/data -v "${dbBackupDir}:/backup" alpine cp -a /data/. /backup/ 2>&1 | Out-Null
         }
         else {
-            Write-Log "No database files found" -Level WARNING
+            docker cp "${script:FastenContainer}:$($script:FastenDbPath)/." $dbBackupDir 2>&1 | Out-Null
         }
 
-        # Backup certificates
-        Write-Log "Backing up certificates..." -Level INFO
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Failed to copy Fasten database" -Level ERROR
+            return $null
+        }
+
+        $dbSize = (Get-ChildItem $dbBackupDir -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+        Write-Log "Database backed up: $([math]::Round($dbSize / 1MB, 2)) MB" -Level INFO
+
+        # Backup certificates from Docker volume
+        Write-Log "Backing up certificates from container volume..." -Level INFO
         $certsBackupDir = Join-Path $backupDir "certs"
         New-Item -ItemType Directory -Force -Path $certsBackupDir | Out-Null
-        $certsDir = Join-Path $script:FastenDeployDir "certs"
-        if (Test-Path $certsDir) {
-            Copy-Item -Path "$certsDir\*" -Destination $certsBackupDir -Force -ErrorAction SilentlyContinue
-        }
-
-        # Backup configuration files
-        Write-Log "Backing up configuration..." -Level INFO
-        $envFile = Join-Path $script:FastenDeployDir ".env"
-        if (Test-Path $envFile) {
-            Copy-Item -Path $envFile -Destination $backupDir -Force
-        }
-        $composeFile = Join-Path $script:FastenDeployDir "docker-compose.yml"
-        if (Test-Path $composeFile) {
-            Copy-Item -Path $composeFile -Destination $backupDir -Force
-        }
-
-        # Backup encryption key (CRITICAL)
-        Write-Log "Backing up encryption key..." -Level INFO
-        $encryptionKey = Join-Path $script:FastenHealthDir "config\encryption_key.txt"
-        if (Test-Path $encryptionKey) {
-            Copy-Item -Path $encryptionKey -Destination $backupDir -Force
-        }
-        else {
-            Write-Log "Encryption key not found - backup may be incomplete" -Level WARNING
-        }
+        docker run --rm -v ra-infrastructure_ra_fasten_certs:/data -v "${certsBackupDir}:/backup" alpine cp -a /data/. /backup/ 2>&1 | Out-Null
 
         # Restart container if we stopped it
         if ($containerWasRunning) {
             Write-Log "Starting Fasten container..." -Level INFO
-            docker compose -f "$script:FastenDeployDir\docker-compose.yml" start 2>&1 | Out-Null
+            docker compose -f $composeFile start ra_fasten 2>&1 | Out-Null
         }
 
         # Create compressed archive
@@ -953,7 +961,8 @@ function New-FastenBackup {
 
         # Ensure container is running even on error
         if ($StopContainer) {
-            docker compose -f "$script:FastenDeployDir\docker-compose.yml" start 2>&1 | Out-Null
+            $composeFile = Join-Path $script:RepoRoot "docker-compose.yml"
+            docker compose -f $composeFile start ra_fasten 2>&1 | Out-Null
         }
 
         return $null

@@ -1,3 +1,6 @@
+# DEPRECATED: Use root docker-compose.yml instead (service: ra_dashboard)
+# This standalone file is kept for reference only.
+#
 # Selfwize Dashboard - Static file server
 # Lightweight nginx container serving the config-driven dashboard
 #

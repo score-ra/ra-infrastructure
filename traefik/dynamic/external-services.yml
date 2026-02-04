@@ -37,15 +37,6 @@ http:
       middlewares:
         - cloudflare-headers
 
-    # Fasten Health Records
-    fasten-router:
-      rule: "Host(`wellness.selfwize.com`)"
-      entryPoints:
-        - web
-      service: fasten-service
-      middlewares:
-        - cloudflare-headers
-
     # Homeseer Home Automation
     homeseer-router:
       rule: "Host(`home.selfwize.com`)"
@@ -99,12 +90,6 @@ http:
       loadBalancer:
         servers:
           - url: "http://host.docker.internal:8082"
-
-    # Fasten Health (HTTP on port 9090)
-    fasten-service:
-      loadBalancer:
-        servers:
-          - url: "http://host.docker.internal:9090"
 
     # Homeseer (HTTP on 192.168.68.56:80)
     homeseer-service:

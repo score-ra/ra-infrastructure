@@ -27,6 +27,9 @@ param(
 
 $ErrorActionPreference = "Continue"
 $script:RepoRoot = Split-Path -Parent $PSScriptRoot
+
+# Load centralized infrastructure config
+. "$PSScriptRoot\Load-InfraConfig.ps1"
 $script:LogDir = Join-Path $RepoRoot "logs"
 $script:LogFile = Join-Path $script:LogDir "health-check.log"
 $script:StateFile = Join-Path $script:LogDir ".health-check-state.json"
@@ -231,46 +234,73 @@ function Send-AlertEmail {
 # Optional: Failure = degraded service, warning only
 $script:Containers = @(
     @{
-        Name        = "inventory-db"
+        Name        = $env:RA_POSTGRES_CONTAINER
         DisplayName = "PostgreSQL"
         Critical    = $true
         HasHealth   = $true
-        TestQuery   = { docker exec inventory-db psql -U inventory -d inventory -c "SELECT 1" 2>&1 }
+        TestQuery   = { docker exec $env:RA_POSTGRES_CONTAINER psql -U $env:RA_POSTGRES_USER -d $env:RA_POSTGRES_DB -c "SELECT 1" 2>&1 }
     },
     @{
-        Name        = "homeautomation-db"
+        Name        = $env:RA_MYSQL_CONTAINER
         DisplayName = "MySQL"
         Critical    = $true
         HasHealth   = $true
         TestQuery   = $null  # Health check via Docker is sufficient
     },
     @{
-        Name        = "traefik"
+        Name        = $env:RA_TRAEFIK_CONTAINER
         DisplayName = "Traefik Proxy"
         Critical    = $true
         HasHealth   = $false
-        HttpCheck   = "http://localhost:8080/api/overview"
+        HttpCheck   = "http://localhost:$($env:RA_TRAEFIK_PORT)/api/overview"
     },
     @{
-        Name        = "ra-status"
+        Name        = $env:RA_GATUS_CONTAINER
         DisplayName = "Gatus Monitor"
         Critical    = $false
         HasHealth   = $false
-        HttpCheck   = "http://localhost:8083/health"
+        HttpCheck   = "http://localhost:$($env:RA_GATUS_PORT)/health"
     },
     @{
-        Name        = "selfwize-dashboard"
+        Name        = $env:RA_DASHBOARD_CONTAINER
         DisplayName = "Selfwize Dashboard"
         Critical    = $false
         HasHealth   = $false
-        HttpCheck   = "http://localhost:8088"
+        HttpCheck   = "http://localhost:$($env:RA_DASHBOARD_PORT)"
     },
     @{
-        Name        = "inventory-pgadmin"
+        Name        = $env:RA_PGADMIN_CONTAINER
         DisplayName = "pgAdmin"
         Critical    = $false
         HasHealth   = $false
-        HttpCheck   = "http://localhost:5050"
+        HttpCheck   = "http://localhost:$($env:RA_PGADMIN_PORT)"
+    },
+    @{
+        Name        = $env:RA_SNIPEIT_CONTAINER
+        DisplayName = "Snipe-IT"
+        Critical    = $false
+        HasHealth   = $false
+        HttpCheck   = "http://localhost:$($env:RA_SNIPEIT_PORT)"
+    },
+    @{
+        Name        = $env:RA_FASTEN_CONTAINER
+        DisplayName = "Fasten Health"
+        Critical    = $false
+        HasHealth   = $false
+    },
+    @{
+        Name        = $env:RA_EVENTLOG_CONTAINER
+        DisplayName = "Event Log"
+        Critical    = $false
+        HasHealth   = $false
+        HttpCheck   = "http://localhost:$($env:RA_EVENTLOG_PORT)"
+    },
+    @{
+        Name        = $env:RA_EVENTLOG_DB_CONTAINER
+        DisplayName = "Event Log DB"
+        Critical    = $false
+        HasHealth   = $true
+        TestQuery   = $null
     }
 )
 
