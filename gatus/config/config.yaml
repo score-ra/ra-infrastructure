@@ -1,0 +1,164 @@
+# Gatus Monitoring Configuration - ra-infrastructure (selfwize.com)
+# Status page accessible at status.selfwize.com
+
+storage:
+  type: sqlite
+  path: /data/gatus.db
+
+ui:
+  title: Selfwize Status
+  header: Selfwize Services
+
+endpoints:
+  # ==========================================================================
+  # INTERNAL SERVICES
+  # ==========================================================================
+
+  - name: Inventory Database
+    group: Infrastructure
+    url: "tcp://ra_postgres:5432"
+    interval: 60s
+    conditions:
+      - "[CONNECTED] == true"
+    ui:
+      hide-hostname: true
+
+  - name: Snipe-IT Database
+    group: Infrastructure
+    url: "tcp://ra_mysql:3306"
+    interval: 60s
+    conditions:
+      - "[CONNECTED] == true"
+    ui:
+      hide-hostname: true
+
+  - name: Snipe-IT
+    group: Services
+    url: "http://ra_snipeit:80"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302)"
+      - "[RESPONSE_TIME] < 5000"
+    ui:
+      hide-hostname: true
+
+  - name: Fasten Health
+    group: Services
+    url: "https://ra_fasten:8080"
+    client:
+      insecure: true
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302)"
+      - "[RESPONSE_TIME] < 5000"
+    ui:
+      hide-hostname: true
+
+  - name: pgAdmin
+    group: Infrastructure
+    url: "http://ra_pgadmin:80"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302)"
+      - "[RESPONSE_TIME] < 5000"
+    ui:
+      hide-hostname: true
+
+  - name: Event Log Database
+    group: Infrastructure
+    url: "tcp://ra_eventlog_db:5432"
+    interval: 60s
+    conditions:
+      - "[CONNECTED] == true"
+    ui:
+      hide-hostname: true
+
+  - name: Daily Event Log
+    group: Services
+    url: "http://ra_eventlog:8000/health"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+    ui:
+      hide-hostname: true
+
+  - name: Dashboard
+    group: Services
+    url: "http://ra_dashboard:80"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 2000"
+    ui:
+      hide-hostname: true
+
+  # ==========================================================================
+  # EXTERNAL ACCESS (via Cloudflare Tunnel)
+  # ==========================================================================
+
+  - name: stuff.selfwize.com
+    group: External
+    url: "https://stuff.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302)"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    ui:
+      hide-hostname: true
+
+  - name: wellness.selfwize.com
+    group: External
+    url: "https://wellness.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302)"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    ui:
+      hide-hostname: true
+
+  - name: cameras.selfwize.com
+    group: External
+    url: "https://cameras.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302, 401)"
+      - "[RESPONSE_TIME] < 10000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    ui:
+      hide-hostname: true
+
+  - name: home.selfwize.com
+    group: External
+    url: "https://home.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == any(200, 302)"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    ui:
+      hide-hostname: true
+
+  - name: events.selfwize.com
+    group: External
+    url: "https://events.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    ui:
+      hide-hostname: true
+
+  - name: dash.selfwize.com
+    group: External
+    url: "https://dash.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    ui:
+      hide-hostname: true

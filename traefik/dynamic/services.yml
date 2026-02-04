@@ -1,0 +1,102 @@
+# Traefik Dynamic Configuration - selfwize.com routes
+# All services use internal Docker network DNS names (ra_network)
+
+http:
+  routers:
+    # Snipe-IT Asset Management
+    stuff-selfwize-router:
+      rule: "Host(`stuff.selfwize.com`)"
+      entryPoints:
+        - web
+      service: stuff-selfwize-service
+
+    # Fasten Health - Personal Health Records
+    wellness-selfwize-router:
+      rule: "Host(`wellness.selfwize.com`)"
+      entryPoints:
+        - web
+      service: wellness-selfwize-service
+
+    # Blue Iris - Security Cameras (proxied from old PC)
+    cameras-selfwize-router:
+      rule: "Host(`cameras.selfwize.com`)"
+      entryPoints:
+        - web
+      service: cameras-selfwize-service
+
+    # Gatus Status Page
+    status-selfwize-router:
+      rule: "Host(`status.selfwize.com`)"
+      entryPoints:
+        - web
+      service: status-selfwize-service
+
+    # Homeseer - Home Automation (proxied from old PC)
+    home-selfwize-router:
+      rule: "Host(`home.selfwize.com`)"
+      entryPoints:
+        - web
+      service: home-selfwize-service
+
+    # Daily Event Log - Personal Event Tracking
+    events-selfwize-router:
+      rule: "Host(`events.selfwize.com`)"
+      entryPoints:
+        - web
+      service: events-selfwize-service
+
+    # Selfwize Dashboard - Service Directory
+    dash-selfwize-router:
+      rule: "Host(`dash.selfwize.com`)"
+      entryPoints:
+        - web
+      service: dash-selfwize-service
+
+  services:
+    # Snipe-IT: internal container on ra_network
+    stuff-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "http://ra_snipeit:80"
+
+    # Fasten Health: internal container on ra_network (uses self-signed HTTPS)
+    wellness-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "https://ra_fasten:8080"
+        serversTransport: insecureTransport
+
+    # Blue Iris: external on old PC (self-signed cert)
+    cameras-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "https://192.168.68.56:443"
+        serversTransport: insecureTransport
+
+    # Gatus: internal container on ra_network
+    status-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "http://ra_gatus:8080"
+
+    # Homeseer: external on old PC
+    home-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.68.56:80"
+
+    # Daily Event Log: internal container on ra_network
+    events-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "http://ra_eventlog:8000"
+
+    # Dashboard: internal container on ra_network
+    dash-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "http://ra_dashboard:80"
+
+  serversTransports:
+    insecureTransport:
+      insecureSkipVerify: true
