@@ -1,5 +1,6 @@
 {
     "title": "Selfwize",
+    "_comment": "Service status values: 'production' (alerts enabled), 'dev' (alerts disabled), 'deprecated' (to be removed)",
     "groups": [
         {
             "id": "home",
@@ -11,14 +12,16 @@
                     "description": "Home automation controller",
                     "url": "https://home.selfwize.com",
                     "icon": "home",
-                    "color": "cyan"
+                    "color": "cyan",
+                    "status": "dev"
                 },
                 {
                     "name": "Blue Iris",
                     "description": "Security cameras",
                     "url": "https://cameras.selfwize.com",
                     "icon": "camera",
-                    "color": "blue"
+                    "color": "blue",
+                    "status": "dev"
                 }
             ]
         },
@@ -32,28 +35,32 @@
                     "description": "Snipe-IT asset management",
                     "url": "https://stuff.selfwize.com",
                     "icon": "inventory",
-                    "color": "green"
+                    "color": "green",
+                    "status": "production"
                 },
                 {
                     "name": "Health Records",
                     "description": "Fasten Health",
                     "url": "https://wellness.selfwize.com",
                     "icon": "health",
-                    "color": "pink"
+                    "color": "pink",
+                    "status": "production"
                 },
                 {
                     "name": "Family Contacts",
                     "description": "Gramps Web genealogy",
                     "url": "https://family.selfwize.com",
                     "icon": "family",
-                    "color": "purple"
+                    "color": "purple",
+                    "status": "dev"
                 },
                 {
                     "name": "Daily Events",
                     "description": "Event log tracker",
                     "url": "https://events.selfwize.com",
                     "icon": "calendar",
-                    "color": "amber"
+                    "color": "amber",
+                    "status": "dev"
                 }
             ]
         },
@@ -67,21 +74,44 @@
                     "description": "pgAdmin PostgreSQL",
                     "url": "http://localhost:5050",
                     "icon": "database",
-                    "color": "blue"
+                    "color": "blue",
+                    "status": "dev"
                 },
                 {
                     "name": "Reverse Proxy",
                     "description": "Traefik dashboard",
                     "url": "http://localhost:8080",
                     "icon": "proxy",
-                    "color": "cyan"
+                    "color": "cyan",
+                    "status": "dev"
                 },
                 {
                     "name": "Status Monitor",
                     "description": "Gatus service health",
                     "url": "https://status.selfwize.com",
                     "icon": "status",
-                    "color": "green"
+                    "color": "green",
+                    "status": "dev"
+                }
+            ]
+        },
+        {
+            "id": "databases",
+            "name": "Databases",
+            "icon": "database",
+            "_comment": "Core infrastructure - not in dashboard UI but tracked for alert status",
+            "services": [
+                {
+                    "name": "PostgreSQL",
+                    "description": "Main inventory database",
+                    "url": "tcp://localhost:5432",
+                    "status": "production"
+                },
+                {
+                    "name": "MySQL",
+                    "description": "Home automation database",
+                    "url": "tcp://localhost:3306",
+                    "status": "production"
                 }
             ]
         }

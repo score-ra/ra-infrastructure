@@ -63,9 +63,30 @@ Edit `services.json` to add services. No code changes required.
     "description": "Optional description shown on hover",
     "url": "https://service.selfwize.com",
     "icon": "server",
-    "color": "blue"
+    "color": "blue",
+    "status": "dev"
 }
 ```
+
+### Service Status
+
+The `status` field tracks service lifecycle and controls alerting behavior in Gatus:
+
+| Status | Alerts | Description |
+|--------|--------|-------------|
+| `production` | Enabled | Live service, failures trigger email alerts |
+| `dev` | Disabled | Development service, monitored but no alerts |
+| `deprecated` | Disabled | Scheduled for removal |
+
+**Important:** When promoting a service to production, update both:
+1. `services.json` - set `"status": "production"`
+2. `gatus/config/gatus.yaml` - set `enabled: true` on the alert
+
+Current production services:
+- PostgreSQL Database
+- MySQL Database
+- Snipe-IT (stuff.selfwize.com)
+- Fasten Health (wellness.selfwize.com)
 
 ### Available Icons
 

@@ -4,6 +4,11 @@
 # Monitors: PostgreSQL, MySQL, pgAdmin, Cloudflare Tunnel endpoints
 # Alerts: Email only (using SMTP from .env)
 # Dashboard: http://localhost:8081
+#
+# ALERT POLICY:
+#   - Production services: alerts enabled (status: production in services.json)
+#   - Dev services: alerts disabled (status: dev in services.json)
+#   - See dashboard/services.json for canonical service status
 
 # =============================================================================
 # STORAGE - SQLite for status history persistence
@@ -48,7 +53,7 @@ alerting:
 endpoints:
 
   # --------------------------------------------------------------------------
-  # DATABASE SERVICES
+  # DATABASE SERVICES (Production - alerts enabled)
   # --------------------------------------------------------------------------
 
   - name: PostgreSQL Database
@@ -59,6 +64,7 @@ endpoints:
       - "[CONNECTED] == true"
     alerts:
       - type: email
+        enabled: true
     ui:
       hide-hostname: true
 
@@ -70,11 +76,12 @@ endpoints:
       - "[CONNECTED] == true"
     alerts:
       - type: email
+        enabled: true
     ui:
       hide-hostname: true
 
   # --------------------------------------------------------------------------
-  # MANAGEMENT SERVICES
+  # MANAGEMENT SERVICES (Dev - alerts disabled)
   # --------------------------------------------------------------------------
 
   - name: pgAdmin
@@ -86,11 +93,13 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
 
   # --------------------------------------------------------------------------
   # EXTERNAL ACCESS (Cloudflare Tunnel)
+  # Production services have Cloudflare Access enabled, dev services do not
   # --------------------------------------------------------------------------
 
   - name: Snipe-IT (External)
@@ -103,6 +112,7 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 168h"
     alerts:
       - type: email
+        enabled: true  # Production - has Cloudflare Access
     ui:
       hide-hostname: true
 
@@ -116,6 +126,7 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 168h"
     alerts:
       - type: email
+        enabled: true  # Production - has Cloudflare Access
     ui:
       hide-hostname: true
 
@@ -129,6 +140,7 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 168h"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
 
@@ -142,11 +154,12 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 168h"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
 
   # --------------------------------------------------------------------------
-  # INFRASTRUCTURE SERVICES
+  # INFRASTRUCTURE SERVICES (Dev - alerts disabled)
   # --------------------------------------------------------------------------
 
   - name: Traefik Reverse Proxy
@@ -158,11 +171,12 @@ endpoints:
       - "[RESPONSE_TIME] < 2000"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
 
   # --------------------------------------------------------------------------
-  # HOME AUTOMATION & SECURITY
+  # HOME AUTOMATION & SECURITY (Dev - alerts disabled)
   # --------------------------------------------------------------------------
 
   - name: Homeseer (External)
@@ -175,6 +189,7 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 168h"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
 
@@ -188,6 +203,7 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 168h"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
 
@@ -200,6 +216,7 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
 
@@ -214,11 +231,12 @@ endpoints:
       - "[RESPONSE_TIME] < 5000"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
 
   # --------------------------------------------------------------------------
-  # LIFE TRACKER SERVICES (ra-life-tracker)
+  # LIFE TRACKER SERVICES (ra-life-tracker) - Dev, alerts disabled
   # --------------------------------------------------------------------------
 
   - name: Family Contacts (External)
@@ -231,6 +249,7 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 168h"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
 
@@ -244,5 +263,6 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 168h"
     alerts:
       - type: email
+        enabled: false  # Dev service
     ui:
       hide-hostname: true
