@@ -80,16 +80,17 @@ http:
         servers:
           - url: "http://host.docker.internal:8088"
 
-    # Gatus (Docker container on port 8083)
+    # Gatus (Docker container on port 8085)
     gatus-service:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:8083"
-    # Snipe-IT (HTTP on port 8082)
+          - url: "http://host.docker.internal:8085"
+
+    # Snipe-IT (HTTP on port 8083)
     snipeit-service:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:8082"
+          - url: "http://host.docker.internal:8083"
 
     # Homeseer (HTTP on 192.168.68.56:80)
     homeseer-service:
@@ -102,7 +103,7 @@ http:
       loadBalancer:
         servers:
           - url: "https://192.168.68.56:443"
-        serversTransport: selfsigned-transport
+        serversTransport: selfsigned-transport@file
 
     # Family Contacts / Gramps Web (HTTP on port 5000)
     family-service:
@@ -110,11 +111,11 @@ http:
         servers:
           - url: "http://host.docker.internal:5000"
 
-    # Daily Event Log (HTTP on port 8000)
+    # Daily Event Log (HTTP on port 8089)
     events-service:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:8000"
+          - url: "http://host.docker.internal:8089"
 
   serversTransports:
     # Transport for services with self-signed certificates
