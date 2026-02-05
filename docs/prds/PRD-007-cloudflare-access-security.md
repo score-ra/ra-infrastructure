@@ -35,7 +35,6 @@ This violates the principle of defense-in-depth and exposes sensitive data to un
 ## Non-Goals
 
 - SSO integration (Google/Microsoft) - future enhancement
-- Service tokens for API access - not needed for current use case
 - Custom identity provider integration
 - Multi-factor authentication beyond email OTP
 - Real-time alerting on access attempts
@@ -279,10 +278,9 @@ If Access causes issues:
 ## Future Enhancements
 
 1. **SSO Integration**: Google Workspace or Microsoft 365 SSO (P2)
-2. **Service Tokens**: API access without email OTP (P3)
-3. **Custom Access Policies**: Time-based access, IP restrictions (P3)
-4. **Access Log Alerting**: Automated alerts on unusual access patterns (P3)
-5. **Temporary Access Links**: Guest access with expiry (P4)
+2. **Custom Access Policies**: Time-based access, IP restrictions (P3)
+3. **Access Log Alerting**: Automated alerts on unusual access patterns (P3)
+4. **Temporary Access Links**: Guest access with expiry (P4)
 
 ---
 
@@ -302,6 +300,7 @@ If Access causes issues:
 |------|--------|---------|
 | 2025-12-20 | Infrastructure Team | Initial PRD creation |
 | 2025-12-20 | Infrastructure Team | Implemented all requirements - marked as Complete |
+| 2026-02-05 | Infrastructure Team | Added CF Access Service Token for device-deployments M2M API access |
 
 ## Implementation Summary
 
@@ -326,6 +325,18 @@ If Access causes issues:
 - ✅ Updated start-here.md (status tracking)
 - ✅ CLOUDFLARE-ACCESS-NEXT-STEPS.md (implementation summary)
 
+### Service Tokens (M2M API Access)
+
+Implemented 2026-02-05 to allow `device-deployments` CLI to access Snipe-IT through CF Access.
+
+| Token Name | Application | Consumer Repo | Created |
+|------------|-------------|---------------|---------|
+| `device-deployments-api` | Asset Inventory (`stuff.selfwize.com`) | `score-ra/device-deployments` | 2026-02-05 |
+
+**How it works:** The client sends `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers alongside the existing Snipe-IT Bearer token. Cloudflare validates the service token at the edge before forwarding to origin. The Asset Inventory Access application has a "Service Auth" policy that accepts this token.
+
+**Related issue:** [score-ra/device-deployments#2](https://github.com/score-ra/device-deployments/issues/2)
+
 ### Security Impact
 
 - ✅ Personal health records (Fasten Health) protected by Zero Trust
@@ -333,3 +344,4 @@ If Access causes issues:
 - ✅ Unauthorized access blocked at Cloudflare edge (before reaching origin)
 - ✅ Audit logs available for compliance monitoring
 - ✅ Defense-in-depth security posture achieved
+- ✅ M2M API access via service tokens (no email OTP bypass needed)
