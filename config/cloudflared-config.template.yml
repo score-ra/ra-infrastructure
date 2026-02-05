@@ -27,12 +27,12 @@ credentials-file: C:\Program Files (x86)\cloudflared\<TUNNEL-UUID>.json
 #   2. Add traefik.http.routers.<name>.rule=Host(`<name>.selfwize.com`) label
 #   3. No changes needed here - wildcard catches all subdomains!
 #
-# For services not in Docker, add to traefik/dynamic/external-services.yml
+# For services not in Docker, add to traefik/dynamic/services.yml
 
 ingress:
   # Wildcard rule - all *.selfwize.com traffic goes to Traefik
   - hostname: "*.selfwize.com"
-    service: http://localhost:80
+    service: http://localhost:8070
 
   # Catch-all rule (required, must be last)
   - service: http_status:404

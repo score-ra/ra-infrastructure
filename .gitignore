@@ -48,6 +48,9 @@ Thumbs.db
 docker/data/
 *.log
 
+# Data directory (backups, dumps, database files)
+data/
+
 # Database
 *.dump
 *.sql

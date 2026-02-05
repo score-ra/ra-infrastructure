@@ -1,5 +1,7 @@
 # Traefik Dynamic Configuration - selfwize.com routes
-# All services use internal Docker network DNS names (ra_network)
+#
+# All *.selfwize.com routes consolidated here. Docker containers use internal
+# DNS names on ra_network; external services use LAN IPs or host.docker.internal.
 
 http:
   routers:
@@ -9,6 +11,8 @@ http:
       entryPoints:
         - web
       service: stuff-selfwize-service
+      middlewares:
+        - cloudflare-headers
 
     # Fasten Health - Personal Health Records
     wellness-selfwize-router:
@@ -16,13 +20,8 @@ http:
       entryPoints:
         - web
       service: wellness-selfwize-service
-
-    # Blue Iris - Security Cameras (proxied from old PC)
-    cameras-selfwize-router:
-      rule: "Host(`cameras.selfwize.com`)"
-      entryPoints:
-        - web
-      service: cameras-selfwize-service
+      middlewares:
+        - cloudflare-headers
 
     # Gatus Status Page
     status-selfwize-router:
@@ -30,20 +29,8 @@ http:
       entryPoints:
         - web
       service: status-selfwize-service
-
-    # Homeseer - Home Automation (proxied from old PC)
-    home-selfwize-router:
-      rule: "Host(`home.selfwize.com`)"
-      entryPoints:
-        - web
-      service: home-selfwize-service
-
-    # Daily Event Log - Personal Event Tracking
-    events-selfwize-router:
-      rule: "Host(`events.selfwize.com`)"
-      entryPoints:
-        - web
-      service: events-selfwize-service
+      middlewares:
+        - cloudflare-headers
 
     # Selfwize Dashboard - Service Directory
     dash-selfwize-router:
@@ -51,51 +38,102 @@ http:
       entryPoints:
         - web
       service: dash-selfwize-service
+      middlewares:
+        - cloudflare-headers
+
+    # Daily Event Log - Personal Event Tracking
+    events-selfwize-router:
+      rule: "Host(`events.selfwize.com`)"
+      entryPoints:
+        - web
+      service: events-selfwize-service
+      middlewares:
+        - cloudflare-headers
+
+    # Blue Iris - Security Cameras (external LAN device)
+    cameras-selfwize-router:
+      rule: "Host(`cameras.selfwize.com`)"
+      entryPoints:
+        - web
+      service: cameras-selfwize-service
+      middlewares:
+        - cloudflare-headers
+
+    # Homeseer - Home Automation (external LAN device)
+    home-selfwize-router:
+      rule: "Host(`home.selfwize.com`)"
+      entryPoints:
+        - web
+      service: home-selfwize-service
+      middlewares:
+        - cloudflare-headers
+
+    # Family Contacts (Gramps Web) - ra-life-tracker
+    family-selfwize-router:
+      rule: "Host(`family.selfwize.com`)"
+      entryPoints:
+        - web
+      service: family-selfwize-service
+      middlewares:
+        - cloudflare-headers
 
   services:
-    # Snipe-IT: internal container on ra_network
+    # Snipe-IT: Docker container on ra_network
     stuff-selfwize-service:
       loadBalancer:
         servers:
           - url: "http://ra_snipeit:80"
 
-    # Fasten Health: internal container on ra_network
+    # Fasten Health: Docker container on ra_network
     wellness-selfwize-service:
       loadBalancer:
         servers:
           - url: "http://ra_fasten:8080"
 
-    # Blue Iris: external on old PC (self-signed cert)
+    # Gatus: Docker container on ra_network
+    status-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "http://ra_gatus:8080"
+
+    # Dashboard: Docker container on ra_network
+    dash-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "http://ra_dashboard:80"
+
+    # Daily Event Log: Docker container on ra_network
+    events-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "http://ra_eventlog:8000"
+
+    # Blue Iris: external on LAN (self-signed cert)
     cameras-selfwize-service:
       loadBalancer:
         servers:
           - url: "https://192.168.68.56:443"
         serversTransport: insecureTransport@file
 
-    # Gatus: internal container on ra_network
-    status-selfwize-service:
-      loadBalancer:
-        servers:
-          - url: "http://ra_gatus:8080"
-
-    # Homeseer: external on old PC
+    # Homeseer: external on LAN
     home-selfwize-service:
       loadBalancer:
         servers:
           - url: "http://192.168.68.56:80"
 
-    # Daily Event Log: internal container on ra_network
-    events-selfwize-service:
+    # Family Contacts / Gramps Web: host-external
+    family-selfwize-service:
       loadBalancer:
         servers:
-          - url: "http://ra_eventlog:8000"
-
-    # Dashboard: internal container on ra_network
-    dash-selfwize-service:
-      loadBalancer:
-        servers:
-          - url: "http://ra_dashboard:80"
+          - url: "http://host.docker.internal:5000"
 
   serversTransports:
     insecureTransport:
       insecureSkipVerify: true
+
+  middlewares:
+    # Cloudflare terminates TLS; tell backends the original protocol was HTTPS
+    cloudflare-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"

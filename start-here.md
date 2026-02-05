@@ -248,7 +248,7 @@ See **[docs/DATABASE.md](docs/DATABASE.md)** for:
 | PostgreSQL | `localhost:5432` |
 | MySQL | `localhost:3306` |
 | pgAdmin | `localhost:5050` |
-| **Traefik** | `localhost:80` (tunnel), `localhost:8080` (dashboard) |
+| **Traefik** | `localhost:8070` (tunnel), `localhost:8080` (dashboard) |
 | **Selfwize Dashboard** | `https://dash.selfwize.com` or `localhost:8088` |
 | **Gatus Dashboard** | `https://status.selfwize.com` or `localhost:8083` |
 | Database (PostgreSQL) | `inventory` |
@@ -368,7 +368,7 @@ Expose local services to the internet via custom domains.
 ### Architecture (PRD-008)
 
 ```
-Internet → Cloudflare (*.selfwize.com) → Tunnel → Traefik:80 → Services
+Internet → Cloudflare (*.selfwize.com) → Tunnel → Traefik:8070 → Services
 ```
 
 All `*.selfwize.com` traffic flows through Traefik reverse proxy. To add new services, just add Docker labels - no Cloudflare changes needed!
