@@ -7,6 +7,7 @@
 #   - Snipe-IT (asset management)
 #   - Fasten Health (personal health records)
 #   - Selfwize Dashboard (service directory)
+#   - Label Service (QR label management)
 #   - Daily Event Log (personal event tracking)
 #   - PostgreSQL 16 (event_log database)
 #   - Traefik (reverse proxy, host port 8070)
@@ -33,6 +34,7 @@ volumes:
   ra_gatus_data:
   ra_pgadmin_data:
   ra_eventlog_postgres_data:
+  ra_labels_data:
 
 services:
   # ==========================================================================
@@ -118,7 +120,7 @@ services:
   # ==========================================================================
 
   ra_snipeit:
-    image: snipe/snipe-it:latest
+    image: snipe/snipe-it:v8.3.7
     container_name: ra_snipeit
     restart: always
     depends_on:
@@ -167,6 +169,36 @@ services:
       - ../ra-life-tracker/.env
     ports:
       - "8089:8000"
+    networks:
+      - ra_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  ra_labels:
+    build:
+      context: ../snipeit-asset-management/src/label-service
+      dockerfile: Dockerfile
+    container_name: ra_labels
+    restart: always
+    environment:
+      - LABEL_SERVICE_ENV=production
+      - LABEL_SERVICE_DB_PATH=/data/labels.db
+      - LABEL_SERVICE_BASE_URL=https://labels.selfwize.com
+      - LABEL_SERVICE_DEFAULT_BACKEND_URL=https://stuff.selfwize.com
+    env_file:
+      - ../snipeit-asset-management/.env
+    ports:
+      - "8100:8000"
+    volumes:
+      - ra_labels_data:/data
     networks:
       - ra_network
     healthcheck:

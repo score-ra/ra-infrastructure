@@ -93,6 +93,16 @@ endpoints:
     ui:
       hide-hostname: true
 
+  - name: Label Service
+    group: Services
+    url: "http://ra_labels:8000/health"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+    ui:
+      hide-hostname: true
+
   # ==========================================================================
   # EXTERNAL ACCESS (via Cloudflare Tunnel)
   # ==========================================================================
@@ -155,6 +165,17 @@ endpoints:
   - name: dash.selfwize.com
     group: External
     url: "https://dash.selfwize.com"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+    ui:
+      hide-hostname: true
+
+  - name: labels.selfwize.com
+    group: External
+    url: "https://labels.selfwize.com/health"
     interval: 60s
     conditions:
       - "[STATUS] == 200"
