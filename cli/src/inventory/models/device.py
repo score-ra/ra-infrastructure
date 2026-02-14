@@ -94,4 +94,4 @@ class Device(DeviceBase, SlugMixin, BaseEntity):
     category_id: Optional[UUID] = None
     zwave_node_id: Optional[int] = None
     zigbee_ieee_address: Optional[str] = None
-    homeseer_ref: Optional[int] = None
+    homeassistant_entity_id: Optional[str] = None

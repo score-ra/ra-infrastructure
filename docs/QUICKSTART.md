@@ -145,7 +145,7 @@ inv db reset --yes            # Reset database
 1. Add your devices to the inventory
 2. Configure zones for your site
 3. Set up network records
-4. Import existing data from HomeSeer
+4. Import existing data from Home Assistant
 
 ## Troubleshooting
 

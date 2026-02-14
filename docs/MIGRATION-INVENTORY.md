@@ -22,7 +22,7 @@
 | Cloudflare Tunnels | 3 (1 actively connected) |
 | Cloudflare subdomain routes | 8 |
 | Windows services | 2 (both STOPPED) |
-| External network services | 2 (Homeseer, Blue Iris on 192.168.68.56) |
+| External network services | 2 (Home Assistant on 192.168.68.68, Blue Iris on 192.168.68.56) |
 | Active backups | PostgreSQL daily (D:\backups) |
 | Stale backups | MySQL (last: 2025-12-14) |
 | Total memory in use | ~2.6 GB across all containers |
@@ -258,7 +258,7 @@ All traffic flows: `Internet → Cloudflare → Tunnel → Traefik :80 → Backe
 | `status.selfwize.com` | Gatus (ra-status) | 8083 | No |
 | `family.selfwize.com` | Gramps Web | 5000 | No |
 | `events.selfwize.com` | Daily Event Log | 8000 | No |
-| `home.selfwize.com` | Homeseer (192.168.68.56) | 80 | No |
+| `home.selfwize.com` | Home Assistant (192.168.68.68) | 8123 | No |
 | `cameras.selfwize.com` | Blue Iris (192.168.68.56) | 443 (HTTPS) | No |
 
 ### Local config file
@@ -276,14 +276,14 @@ All traffic flows: `Internet → Cloudflare → Tunnel → Traefik :80 → Backe
 
 ## 11. External Network Services
 
-These run on a separate machine (192.168.68.56), not on this PC. They are routed through Traefik via `host.docker.internal`.
+These run on separate machines on the LAN, not on this PC. They are routed through Traefik.
 
 | Service | Internal URL | External URL | Notes |
 |---------|-------------|-------------|-------|
-| **Homeseer** | `http://192.168.68.56:80` | `https://home.selfwize.com` | Home automation controller |
+| **Home Assistant** | `http://192.168.68.68:8123` | `https://home.selfwize.com` | Home automation controller |
 | **Blue Iris** | `https://192.168.68.56:443` | `https://cameras.selfwize.com` | Security camera NVR. Self-signed cert (Traefik uses `insecureSkipVerify`). |
 
-**Migration note**: These services do not run on this PC. Only the Traefik routing config and Cloudflare tunnel DNS entries need to be migrated. The IP address (192.168.68.56) will remain the same on the local network.
+**Migration note**: These services do not run on this PC. Only the Traefik routing config and Cloudflare tunnel DNS entries need to be migrated.
 
 ---
 
@@ -562,7 +562,7 @@ All located under `C:\Users\ranand\workspace\personal\software\`:
     - [ ] https://status.selfwize.com (Gatus)
     - [ ] https://family.selfwize.com (Gramps Web)
     - [ ] https://events.selfwize.com (Daily Event Log)
-    - [ ] https://home.selfwize.com (Homeseer — proxied, not on this PC)
+    - [ ] https://home.selfwize.com (Home Assistant — proxied, not on this PC)
     - [ ] https://cameras.selfwize.com (Blue Iris — proxied, not on this PC)
 24. [ ] Verify backups are running on new PC:
     ```bash

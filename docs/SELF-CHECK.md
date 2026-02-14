@@ -39,7 +39,7 @@ inv system check-endpoint https://status.selfwize.com
 - **Status Monitor** (status.selfwize.com)
 - **Asset Inventory** (stuff.selfwize.com) - Cloudflare Access protected
 - **Health Records** (wellness.selfwize.com) - Cloudflare Access protected
-- **Homeseer** (home.selfwize.com) - Cloudflare Access protected
+- **Home Assistant** (home.selfwize.com) - Cloudflare Access protected
 - **Blue Iris** (cameras.selfwize.com) - Cloudflare Access protected
 - **Family Contacts** (family.selfwize.com) - Cloudflare Access protected
 - **Daily Events** (events.selfwize.com) - Cloudflare Access protected
@@ -85,7 +85,7 @@ External Endpoints (*.selfwize.com)
   Status Monitor         OK    HTTP 200 (203ms)
   Asset Inventory        OK    HTTP 403 (auth required)
   Health Records         OK    HTTP 403 (auth required)
-  Homeseer              OK    HTTP 200 (490ms)
+  Home Assistant        OK    HTTP 200 (490ms)
   Blue Iris             OK    HTTP 200 (312ms)
   Family Contacts       OK    HTTP 200 (177ms)
   Daily Events          OK    HTTP 200 (105ms)

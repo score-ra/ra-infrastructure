@@ -115,8 +115,8 @@ Breaking changes will:
 | `status` | Stable | online/offline/unknown/maintenance/decommissioned |
 | `last_seen` | Stable | Last discovery timestamp |
 | `metadata` | Stable (structure unstable) | JSONB - keys within may change |
-| `homeseer_ref` | Stable | HomeSeer integration reference |
-| Integration columns | Semi-stable | `homeassistant_entity_id`, `blueiris_short_name` |
+| `homeassistant_entity_id` | Stable | Home Assistant entity reference |
+| Integration columns | Semi-stable | `blueiris_short_name` |
 
 ---
 

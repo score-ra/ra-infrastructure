@@ -158,7 +158,7 @@ def _check_selfwize_dashboard() -> Tuple[bool, str, List[str]]:
 
     # Expected services
     expected_services = [
-        "Homeseer",
+        "Home Assistant",
         "Blue Iris",
         "Asset Inventory",
         "Health Records",
@@ -339,7 +339,7 @@ def selfcheck(
         ("https://status.selfwize.com", "Status Monitor", False, False),
         ("https://stuff.selfwize.com", "Asset Inventory", False, True),
         ("https://wellness.selfwize.com", "Health Records", False, True),
-        ("https://home.selfwize.com", "Homeseer", False, True),
+        ("https://home.selfwize.com", "Home Assistant", False, True),
         ("https://cameras.selfwize.com", "Blue Iris", False, True),
         ("https://family.selfwize.com", "Family Contacts", False, True),
         ("https://events.selfwize.com", "Daily Events", False, True),

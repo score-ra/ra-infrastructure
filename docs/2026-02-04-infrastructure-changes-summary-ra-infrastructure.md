@@ -35,7 +35,7 @@ ra-infrastructure was separated out of sc-infrastructure into its own standalone
 | https://wellness.selfwize.com | Fasten Health | Live (302) |
 | https://events.selfwize.com | Daily Event Log | Live (200) |
 | https://dash.selfwize.com | Dashboard | Live (200) |
-| https://home.selfwize.com | Homeseer (old PC) | Live (200) |
+| https://home.selfwize.com | Home Assistant (192.168.68.68) | Live (200) |
 | https://status.selfwize.com | Gatus | Live (200) |
 | https://cameras.selfwize.com | Blue Iris (old PC) | Backlog |
 
@@ -87,7 +87,7 @@ ra-infrastructure was separated out of sc-infrastructure into its own standalone
 - All Gatus monitoring for selfwize services (via `gatus/config/config.yaml`)
 - Database management for inventory (PG :5433), event_log (PG :5434), and Snipe-IT (MySQL :3307)
 - Dashboard SPA content and configuration
-- Coordination with old PC for proxied services (Homeseer, Blue Iris)
+- Coordination with Home Assistant (192.168.68.68) and old PC for proxied services (Blue Iris)
 
 ### Boundary with sc-infrastructure
 
@@ -108,7 +108,7 @@ This repo is responsible for triaging and resolving infrastructure issues report
 - Database connectivity or performance issues (PG :5433, PG :5434, MySQL :3307)
 - Cloudflare tunnel connectivity for selfwize-dev tunnel
 - Gatus monitoring alerts for selfwize endpoints
-- Proxied service issues (Homeseer/Blue Iris routing from old PC)
+- Proxied service issues (Home Assistant/Blue Iris routing)
 
 ---
 
@@ -133,5 +133,5 @@ Before this infrastructure is considered production-ready, conduct a repo health
 
 - [ ] **cameras.selfwize.com**: DNS + Traefik route configured, but Blue Iris HTTPS (192.168.68.56:443) unreachable from Docker. Service may be replaced. Revisit when replacement is deployed.
 - [ ] **Fasten Health**: App in STANDBY mode — needs encryption key setup via UI at https://wellness.selfwize.com
-- [ ] **Old PC decommission**: Stop legacy containers (daily-event-log, event-log-db, snipeit-app, snipeit-db, etc.) after validation period. Do NOT stop Homeseer or Blue Iris.
+- [ ] **Old PC decommission**: Stop legacy containers (daily-event-log, event-log-db, snipeit-app, snipeit-db, etc.) after validation period. HomeSeer still runs on old PC; home.selfwize.com now routes to Home Assistant (192.168.68.68).
 - [ ] **Repo health check**: Complete the checklist above and confirm readiness.

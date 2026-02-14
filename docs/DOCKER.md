@@ -73,7 +73,7 @@ ra-infrastructure uses Docker Compose to manage three database containers that p
 - Separate from the main inventory database for isolation
 
 **Why MySQL 5.7 (not 8.0):**
-MySQL 5.7 is used instead of 8.0 for compatibility with older .NET MySQL connectors used by home automation plugins (e.g., HomeSeer mcsMQTT). MySQL 8.0 introduced:
+MySQL 5.7 is used instead of 8.0 for compatibility with legacy home automation connectors. MySQL 8.0 introduced:
 - `caching_sha2_password` as the default authentication plugin (older connectors only support `mysql_native_password`)
 - `utf8mb3` charset naming (older connectors don't recognize this alias)
 

@@ -189,9 +189,9 @@ def show(slug: str = typer.Argument(..., help="Device slug")):
         if device["zigbee_ieee_address"]:
             console.print(f"  Zigbee IEEE: {device['zigbee_ieee_address']}")
 
-    if device["homeseer_ref"]:
+    if device.get("homeassistant_entity_id"):
         console.print("\n[bold]Integrations[/bold]")
-        console.print(f"  HomeSeer: {device['homeseer_ref']}")
+        console.print(f"  Home Assistant: {device['homeassistant_entity_id']}")
 
 
 @app.command()

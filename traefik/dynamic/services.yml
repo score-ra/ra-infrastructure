@@ -59,7 +59,7 @@ http:
       middlewares:
         - cloudflare-headers
 
-    # Homeseer - Home Automation (external LAN device)
+    # Home Assistant - Home Automation (external LAN device)
     home-selfwize-router:
       rule: "Host(`home.selfwize.com`)"
       entryPoints:
@@ -115,11 +115,11 @@ http:
           - url: "https://192.168.68.56:443"
         serversTransport: insecureTransport@file
 
-    # Homeseer: external on LAN
+    # Home Assistant: external on LAN
     home-selfwize-service:
       loadBalancer:
         servers:
-          - url: "http://192.168.68.56:80"
+          - url: "http://192.168.68.68:8123"
 
     # Family Contacts / Gramps Web: host-external
     family-selfwize-service:

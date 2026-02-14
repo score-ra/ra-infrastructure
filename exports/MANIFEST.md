@@ -116,7 +116,7 @@ The main asset inventory file. Each row represents a device/asset.
 ### Integration References
 | Column | Description |
 |--------|-------------|
-| homeseer_ref | HomeSeer device reference |
+| homeseer_ref | HomeSeer device reference (removed in migration 006) |
 | homeassistant_entity_id | Home Assistant entity ID |
 | blueiris_short_name | Blue Iris camera short name |
 

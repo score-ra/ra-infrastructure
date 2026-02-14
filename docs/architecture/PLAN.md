@@ -13,10 +13,10 @@ This document defines the architecture for `ra-infrastructure`, a home infrastru
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | API Layer | CLI only | Simplicity; web app embeds in CLI |
-| Integration Priority | HomeSeer first | Primary automation system |
+| Integration Priority | Home Assistant first | Primary automation system |
 | Multi-Site Support | 4+ sites | Family members, offices |
 | Automation Scope | Inventory only | Track, don't control |
-| Deployment | Single Windows machine | HomeSeer server |
+| Deployment | Single Windows machine | Infrastructure server |
 | Web UI | Full CRUD + topology | Embedded Python web server |
 | Security | VPN access only | No public exposure |
 
@@ -54,7 +54,7 @@ This document defines the architecture for `ra-infrastructure`, a home infrastru
           ┌───────────────────┼───────────────────┐
           │                   │                   │
    ┌──────▼──────┐    ┌───────▼───────┐   ┌──────▼──────┐
-   │  HomeSeer   │    │ Network Scan  │   │   Future    │
+   │Home Assistant│    │ Network Scan  │   │   Future    │
    │  (Primary)  │    │  (PowerShell) │   │ Integrations│
    └─────────────┘    └───────────────┘   └─────────────┘
 ```
@@ -65,9 +65,9 @@ This document defines the architecture for `ra-infrastructure`, a home infrastru
 |-----------|---------------|
 | **CLI (`inv`)** | All CRUD operations, migrations, imports, reports |
 | **Web Dashboard** | Visual interface for browsing, editing, topology |
-| **Scheduled Tasks** | Automated network scans, HomeSeer sync |
+| **Scheduled Tasks** | Automated network scans, Home Assistant sync |
 | **PostgreSQL** | Single source of truth for all inventory data |
-| **HomeSeer Integration** | Sync devices from HomeSeer to inventory |
+| **Home Assistant Integration** | Sync devices from Home Assistant to inventory |
 | **Network Scanner** | Discover devices on network, populate inventory |
 
 ---
@@ -110,7 +110,7 @@ cli/
 │   ├── integrations/           # External system integrations (NEW)
 │   │   ├── __init__.py
 │   │   ├── base.py             # Base integration class
-│   │   ├── homeseer.py         # HomeSeer API client
+│   │   ├── homeassistant.py     # Home Assistant API client
 │   │   └── network_scanner.py  # PowerShell network discovery
 │   │
 │   └── web/                    # Web dashboard (NEW)
@@ -174,7 +174,7 @@ class DeviceRepository(BaseRepository):
     def find_by_site(self, site_id: UUID) -> list[Device]: ...
     def find_by_zone(self, zone_id: UUID) -> list[Device]: ...
     def find_by_mac(self, mac: str) -> Device | None: ...
-    def find_by_homeseer_ref(self, ref: str) -> Device | None: ...
+    def find_by_ha_entity_id(self, entity_id: str) -> Device | None: ...
     def upsert_from_discovery(self, device: DiscoveredDevice) -> Device: ...
 ```
 
@@ -182,12 +182,12 @@ class DeviceRepository(BaseRepository):
 
 ## 3. Integration Architecture
 
-### 3.1 HomeSeer Integration (Priority 1)
+### 3.1 Home Assistant Integration (Priority 1)
 
 ```
 ┌─────────────────┐         ┌─────────────────┐
-│    HomeSeer     │  HTTP   │  ra-infra CLI   │
-│    HS4 API      │◄───────►│  sync homeseer  │
+│ Home Assistant  │  HTTP   │  ra-infra CLI   │
+│   REST API      │◄───────►│sync homeassistant│
 └─────────────────┘   JSON  └────────┬────────┘
                                      │
                             ┌────────▼────────┐
@@ -196,27 +196,26 @@ class DeviceRepository(BaseRepository):
                             └─────────────────┘
 ```
 
-**HomeSeer API Endpoints Used:**
-- `GET /JSON?request=getstatus` - All device status
-- `GET /JSON?request=getdevices` - Device definitions
-- `GET /JSON?request=getlocations` - Locations (maps to zones)
+**Home Assistant API Endpoints Used:**
+- `GET /api/states` - All entity states
+- `GET /api/config` - Configuration and location info
+- `GET /api/services` - Available services
 
 **Sync Strategy:**
-1. Full sync: `inv sync homeseer --full` (initial import)
-2. Incremental sync: `inv sync homeseer` (update status, last_seen)
+1. Full sync: `inv sync homeassistant --full` (initial import)
+2. Incremental sync: `inv sync homeassistant` (update status, last_seen)
 3. Scheduled sync: Windows Task Scheduler runs every 15 minutes
 
 **Field Mapping:**
 
-| HomeSeer Field | PostgreSQL Field |
-|----------------|------------------|
-| `ref` | `homeseer_ref` |
-| `name` | `name` |
-| `device_type_string` | `device_type` |
-| `location` | `zone_id` (lookup) |
-| `location2` | `zone_id` (lookup) |
-| `interface` | `metadata.interface` |
-| `relationship` | `metadata.relationship` |
+| Home Assistant Field | PostgreSQL Field |
+|----------------------|------------------|
+| `entity_id` | `homeassistant_entity_id` |
+| `attributes.friendly_name` | `name` |
+| `attributes.device_class` | `device_type` |
+| `attributes.area_id` | `zone_id` (lookup) |
+| `state` | `status` |
+| `attributes` | `metadata` |
 
 ### 3.2 Network Discovery Integration
 
@@ -252,7 +251,7 @@ Organization (Anand Family)
 │   │   │   └── Devices...
 │   │   └── Zone (Kitchen)
 │   └── Zone (Server Closet)
-│       └── Devices (HomeSeer, switches, etc.)
+│       └── Devices (Home Assistant, switches, etc.)
 │
 ├── Site (Vacation Home - Tahoe)
 │   └── Zones...
@@ -272,7 +271,7 @@ Organization (Work - SymphonyCore)
 | **Unique slugs** | Slugs unique within site, not globally |
 | **Network isolation** | Each site has independent networks |
 | **Remote management** | VPN to each site, single dashboard |
-| **HomeSeer instances** | Each site may have its own HomeSeer (or not) |
+| **Home Assistant instances** | Each site may have its own Home Assistant (or not) |
 | **Data filtering** | All queries scoped by site by default |
 
 ### 4.3 Site Configuration
@@ -280,8 +279,8 @@ Organization (Work - SymphonyCore)
 ```sql
 -- sites table metadata for integration settings
 {
-    "homeseer_url": "http://192.168.68.56",
-    "homeseer_enabled": true,
+    "homeassistant_url": "http://192.168.68.68:8123",
+    "homeassistant_enabled": true,
     "blueiris_url": "http://192.168.68.56:81",
     "blueiris_enabled": false,
     "network_scan_enabled": true,
@@ -333,7 +332,7 @@ Organization (Work - SymphonyCore)
 │        │                                                     │
 │    ┌───┴────┬────────┬────────┐                             │
 │    │        │        │        │                             │
-│  [Switch] [AP-1]  [AP-2]  [HomeSeer]                        │
+│  [Switch] [AP-1]  [AP-2]  [HA]                              │
 │    │                           │                             │
 │  ┌─┴──┐                    ┌───┴───┐                        │
 │  │    │                    │       │                        │
@@ -368,18 +367,18 @@ Organization (Work - SymphonyCore)
 | Add Pydantic models for validation | P1 | Pending |
 | Achieve 80% test coverage | P1 | Pending |
 
-### Phase 2: HomeSeer Integration (1-2 weeks)
-**Goal**: Sync HomeSeer devices to inventory
+### Phase 2: Home Assistant Integration (1-2 weeks)
+**Goal**: Sync Home Assistant devices to inventory
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Create HomeSeer API client | P0 | Pending |
-| Implement `inv sync homeseer --full` | P0 | Pending |
-| Implement `inv sync homeseer` (incremental) | P0 | Pending |
-| Map HomeSeer locations to zones | P1 | Pending |
-| Map HomeSeer device types to categories | P1 | Pending |
+| Create Home Assistant REST API client | P0 | Pending |
+| Implement `inv sync homeassistant --full` | P0 | Pending |
+| Implement `inv sync homeassistant` (incremental) | P0 | Pending |
+| Map Home Assistant areas to zones | P1 | Pending |
+| Map Home Assistant device classes to categories | P1 | Pending |
 | Create Windows scheduled task for sync | P2 | Pending |
-| Test with real HomeSeer instance | P0 | Pending |
+| Test with real Home Assistant instance | P0 | Pending |
 
 ### Phase 3: Network Discovery (1 week)
 **Goal**: Discover network devices automatically
@@ -430,7 +429,7 @@ After approval, these documents will be created:
 |----------|----------|---------|
 | Architecture Overview | `docs/architecture/OVERVIEW.md` | High-level system design |
 | Database Schema | `docs/architecture/DATABASE.md` | Schema documentation |
-| Integration Guide | `docs/architecture/INTEGRATIONS.md` | HomeSeer, network discovery |
+| Integration Guide | `docs/architecture/INTEGRATIONS.md` | Home Assistant, network discovery |
 | Web Dashboard Design | `docs/architecture/WEB-DASHBOARD.md` | UI/UX specifications |
 | API Reference | `docs/architecture/CLI-REFERENCE.md` | CLI command documentation |
 | Development Guide | `docs/DEVELOPMENT.md` | Setup, testing, contributing |
@@ -439,11 +438,11 @@ After approval, these documents will be created:
 
 ## 8. Open Questions
 
-1. **HomeSeer API Access**: Do you have the HomeSeer JSON API enabled? (Settings → Setup → Web Server → Enable JSON)
+1. **Home Assistant API Access**: Do you have a Home Assistant long-lived access token configured? (Profile → Long-Lived Access Tokens → Create Token)
 
-2. **Multiple HomeSeer Instances**: Will remote sites have their own HomeSeer, or centrally managed?
+2. **Multiple Home Assistant Instances**: Will remote sites have their own Home Assistant, or centrally managed?
 
-3. **Device Naming**: When HomeSeer and network discovery find the same device, which name wins?
+3. **Device Naming**: When Home Assistant and network discovery find the same device, which name wins?
 
 4. **Dashboard Auth**: Even on VPN, do you want basic auth for the web dashboard?
 

@@ -6,32 +6,32 @@
 
 ---
 
-## HomeSeer Integration (ra-home-automation)
+## Home Assistant Integration (ra-home-automation)
 
-### ISSUE-001: HomeSeer JSON API Access
+### ISSUE-001: Home Assistant REST API Access
 **Priority**: P0 - Blocker for Phase 2
 
-**Question**: Is the HomeSeer JSON API enabled?
+**Question**: Is a Home Assistant long-lived access token configured?
 
 **Action Required**:
-- Verify at: `http://192.168.68.56/JSON?request=getstatus`
-- If not enabled: Settings > Setup > Web Server > Enable JSON
+- Verify API at: `http://192.168.68.68:8123/api/`
+- If no token: Profile → Long-Lived Access Tokens → Create Token
 
 **Repo**: `ra-home-automation`
 
 ---
 
-### ISSUE-002: Multiple HomeSeer Instances
+### ISSUE-002: Multiple Home Assistant Instances
 **Priority**: P1 - Affects multi-site architecture
 
-**Question**: Will remote sites have their own HomeSeer instance, or is there a single centralized HomeSeer?
+**Question**: Will remote sites have their own Home Assistant instance, or is there a single centralized instance?
 
 **Options**:
-- A) Single HomeSeer at primary residence only
-- B) Each site has independent HomeSeer
-- C) Centralized HomeSeer with remote Z-Wave/Zigbee bridges
+- A) Single Home Assistant at primary residence only
+- B) Each site has independent Home Assistant
+- C) Centralized Home Assistant with remote integrations
 
-**Impact**: Determines how `inv sync homeseer` handles multiple sites.
+**Impact**: Determines how `inv sync homeassistant` handles multiple sites.
 
 **Repo**: `ra-home-automation`
 
@@ -40,15 +40,15 @@
 ### ISSUE-003: Device Naming Conflict Resolution
 **Priority**: P2 - UX decision
 
-**Question**: When network discovery and HomeSeer both find the same device (matched by MAC or IP), which name should be authoritative?
+**Question**: When network discovery and Home Assistant both find the same device (matched by MAC or IP), which name should be authoritative?
 
 **Options**:
-- A) HomeSeer name wins (user-configured)
+- A) Home Assistant entity name wins (user-configured)
 - B) Network discovery name wins (hostname)
 - C) First one wins, never overwrite
-- D) Store both, display HomeSeer name
+- D) Store both, display Home Assistant name
 
-**Suggested Default**: Option A - HomeSeer name wins (user intent)
+**Suggested Default**: Option A - Home Assistant entity name wins (user intent)
 
 **Repo**: `ra-home-automation` or product decision
 

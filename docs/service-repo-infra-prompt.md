@@ -60,7 +60,7 @@ A major consolidation unified all infrastructure under a single compose stack. T
 | Domain | Backend |
 |--------|---------|
 | `cameras.selfwize.com` | Blue Iris at `192.168.68.56:443` |
-| `home.selfwize.com` | Homeseer at `192.168.68.56:80` |
+| `home.selfwize.com` | Home Assistant at `192.168.68.68:8123` |
 | `family.selfwize.com` | Gramps Web at `host.docker.internal:5000` |
 
 ### Database Connection Strings

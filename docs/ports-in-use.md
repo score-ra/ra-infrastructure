@@ -33,6 +33,6 @@ Routed through Traefik via `host.docker.internal` or direct LAN IP.
 
 | Port | Service | Address | Protocol | Domain |
 |------|---------|---------|----------|--------|
-| 80 | Homeseer | 192.168.68.56 | HTTP | home.selfwize.com |
+| 8123 | Home Assistant | 192.168.68.68 | HTTP | home.selfwize.com |
 | 443 | Blue Iris | 192.168.68.56 | HTTPS (self-signed) | cameras.selfwize.com |
 | 5000 | Gramps Web | host.docker.internal | HTTP | family.selfwize.com |

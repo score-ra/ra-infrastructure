@@ -9,7 +9,7 @@ When making schema changes, check this list to identify affected consumers and n
 | Repository | Access Level | Tables Used | Primary Use Case |
 |------------|--------------|-------------|------------------|
 | [network-tools](https://github.com/score-ra/network-tools) | READ/WRITE | devices, networks, sites, device_categories | Network device discovery and inventory updates |
-| [ra-home-automation](https://github.com/score-ra/ra-home-automation) | READ | devices | HomeSeer/BlueIris device reference |
+| [ra-home-automation](https://github.com/score-ra/ra-home-automation) | READ | devices | Home Assistant/BlueIris device reference |
 
 ## Integration Details
 
@@ -30,7 +30,7 @@ When making schema changes, check this list to identify affected consumers and n
 - **Connection**: Read-only queries (future)
 - **Operations**: READ only
 - **Key columns used**:
-  - `devices.homeseer_ref`
+  - `devices.homeassistant_entity_id`
   - `devices.blueiris_short_name`
 - **Status**: Not yet integrated (planned)
 

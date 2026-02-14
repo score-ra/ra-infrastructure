@@ -96,7 +96,7 @@ inv site show primary-residence
 # Devices
 inv device list --site primary-residence
 inv device create "Living Room Switch" --type switch --zone living-room
-inv device import homeseer --file devices.json
+inv device import homeassistant --file devices.json
 inv device show living-room-switch
 
 # Networks
@@ -149,7 +149,7 @@ All services are accessible via the **Selfwize Dashboard** at https://dash.selfw
 | **Health Records** | https://wellness.selfwize.com | Fasten Health |
 | **Family Contacts** | https://family.selfwize.com | Gramps Web genealogy |
 | **Daily Events** | https://events.selfwize.com | Event log tracker |
-| **Home Automation** | https://home.selfwize.com | Homeseer |
+| **Home Automation** | https://home.selfwize.com | Home Assistant |
 | **Security Cameras** | https://cameras.selfwize.com | Blue Iris |
 
 ### Infrastructure Services (Local Only)
@@ -193,13 +193,13 @@ This repo provides the central database that other repos connect to:
 
 | Repo | Integration |
 |------|-------------|
-| `ra-home-automation` | Syncs HomeSeer devices to inventory |
+| `ra-home-automation` | Syncs Home Assistant devices to inventory |
 | `ra-network` | Network discovery populates devices |
 | Future repos | Connect via CLI or API |
 
 ## Related Repositories
 
-- [ra-home-automation](../ra-home-automation) - HomeSeer, BlueIris automation
+- [ra-home-automation](../ra-home-automation) - Home Assistant, BlueIris automation
 - [ra-network](../ra-network) - Network management (future)
 
 ## License

@@ -45,15 +45,15 @@ Developer reference for understanding the traffic flow, component interactions, 
 │  │    Host: status.selfwize.com   → gatus-service                              │    │
 │  │    Host: stuff.selfwize.com    → snipeit-service                            │    │
 │  │    Host: wellness.selfwize.com → fasten-service                             │    │
-│  │    Host: home.selfwize.com     → homeseer-service                           │    │
+│  │    Host: home.selfwize.com     → home-selfwize-service                      │    │
 │  │    Host: cameras.selfwize.com  → blueiris-service                           │    │
 │  └─────────────────────────────────────────────────────────────────────────────┘    │
 └───────┬─────────────┬─────────────┬─────────────┬─────────────┬─────────────┬───────┘
         │             │             │             │             │             │
         ▼             ▼             ▼             ▼             ▼             ▼
 ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐
-│  Homarr   │ │   Gatus   │ │ Snipe-IT  │ │  Fasten   │ │ Homeseer  │ │ Blue Iris │
-│  :7575    │ │   :8083   │ │   :8082   │ │   :9090   │ │   :80     │ │   :443    │
+│  Homarr   │ │   Gatus   │ │ Snipe-IT  │ │  Fasten   │ │ Home Asst │ │ Blue Iris │
+│  :7575    │ │   :8083   │ │   :8082   │ │   :9090   │ │   :8123   │ │   :443    │
 │  Docker   │ │  Docker   │ │  Docker   │ │  Docker   │ │  Native   │ │  Native   │
 │ internal  │ │ internal  │ │ internal  │ │ internal  │ │192.168.68 │ │192.168.68 │
 └───────────┘ └───────────┘ └───────────┘ └───────────┘ └───────────┘ └───────────┘
@@ -147,7 +147,7 @@ http:
 | Service Type | URL Pattern | Example |
 |--------------|-------------|---------|
 | Docker container | `http://host.docker.internal:<port>` | `http://host.docker.internal:7575` |
-| External host | `http://<ip>:<port>` | `http://192.168.68.56:80` |
+| External host | `http://<ip>:<port>` | `http://192.168.68.68:8123` |
 | HTTPS with self-signed | Add `serversTransport: selfsigned-transport` | Fasten, Blue Iris |
 
 ### 4. Backend Services
@@ -158,7 +158,7 @@ http:
 | Gatus | `ra-status` | 8083 | `host.docker.internal:8083` |
 | Snipe-IT | `snipeit-app` | 8082 | `host.docker.internal:8082` |
 | Fasten | `fasten-deploy-fasten-prod-1` | 9090 | `host.docker.internal:9090` (HTTPS) |
-| Homeseer | Native Windows | 80 | `192.168.68.56:80` |
+| Home Assistant | Home Assistant OS | 8123 | `192.168.68.68:8123` |
 | Blue Iris | Native Windows | 443 | `192.168.68.56:443` (HTTPS) |
 
 ## Request Flow Example
