@@ -42,7 +42,7 @@ services:
   ra_postgres:
     image: postgres:16-alpine
     container_name: ra_postgres
-    restart: unless-stopped
+    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -67,7 +67,7 @@ services:
   ra_mysql:
     image: mysql:8.0
     container_name: ra_mysql
-    restart: unless-stopped
+    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: snipeit
@@ -92,7 +92,7 @@ services:
   ra_eventlog_db:
     image: postgres:16-alpine
     container_name: ra_eventlog_db
-    restart: unless-stopped
+    restart: always
     environment:
       POSTGRES_USER: eventlog
       POSTGRES_PASSWORD: ${EVENTLOG_DB_PASSWORD:-eventlog_secret}
@@ -120,7 +120,7 @@ services:
   ra_snipeit:
     image: snipe/snipe-it:latest
     container_name: ra_snipeit
-    restart: unless-stopped
+    restart: always
     depends_on:
       ra_mysql:
         condition: service_healthy
@@ -141,7 +141,7 @@ services:
   ra_fasten:
     image: ghcr.io/fastenhealth/fasten-onprem:main
     container_name: ra_fasten
-    restart: unless-stopped
+    restart: always
     ports:
       - "9091:8080"
     volumes:
@@ -159,7 +159,7 @@ services:
   ra_eventlog:
     image: daily-event-log:latest
     container_name: ra_eventlog
-    restart: unless-stopped
+    restart: always
     depends_on:
       ra_eventlog_db:
         condition: service_healthy
@@ -183,7 +183,7 @@ services:
   ra_dashboard:
     image: nginx:alpine
     container_name: ra_dashboard
-    restart: unless-stopped
+    restart: always
     ports:
       - "8088:80"
     volumes:
@@ -202,7 +202,7 @@ services:
   ra_traefik:
     image: traefik:v3.2
     container_name: ra_traefik
-    restart: unless-stopped
+    restart: always
     ports:
       - "8070:80"
     volumes:
@@ -218,7 +218,7 @@ services:
   ra_gatus:
     image: twinproduction/gatus:latest
     container_name: ra_gatus
-    restart: unless-stopped
+    restart: always
     ports:
       - "8085:8080"
     volumes:
@@ -234,7 +234,7 @@ services:
   ra_pgadmin:
     image: dpage/pgadmin4:latest
     container_name: ra_pgadmin
-    restart: unless-stopped
+    restart: always
     depends_on:
       ra_postgres:
         condition: service_healthy
