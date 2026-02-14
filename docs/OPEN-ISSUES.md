@@ -54,6 +54,26 @@
 
 ---
 
+### ISSUE-005: home.selfwize.com returns 400 — HA trusted proxies not configured
+**Priority**: P0 - Blocker for home.selfwize.com
+
+**Symptom**: Traefik routes to `192.168.68.68:8123` correctly, but HA returns `400 Bad Request` because it doesn't trust the proxy.
+
+**Action Required**: Add to HA's `configuration.yaml`:
+```yaml
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 192.168.68.74
+    - 172.16.0.0/12
+```
+
+**Tracking**: [ra-home-automation issue](https://github.com/score-ra/ra-home-automation) (assigned there for fix)
+
+**Repo**: `ra-home-automation`
+
+---
+
 ## Web Dashboard (ra-infrastructure)
 
 ### ISSUE-004: Dashboard Authentication
