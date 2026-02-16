@@ -1,5 +1,42 @@
 # ra-infrastructure
 
+| Field | Value |
+|-------|-------|
+| **Status** | Active |
+| **Tier** | T1 Critical |
+| **Kind** | Infrastructure |
+| **Org** | score-ra |
+| **Infra Repo** | Self (this is the RA infra repo) |
+| **Last Reviewed** | 2026-02-15 |
+
+## Purpose
+
+Central infrastructure for personal/home services. Orchestrates 10+ services via Docker Compose including PostgreSQL (inventory + event logs), MySQL (Snipe-IT), Traefik reverse proxy, Gatus monitoring, and application containers for Snipe-IT asset management, Fasten Health records, Daily Event Log, and QR label service. Supports multi-organization and multi-site device tracking.
+
+## Scope
+
+**This repo IS for:**
+- Docker Compose orchestration for personal services
+- Device inventory database (PostgreSQL)
+- Traefik routing, Gatus monitoring, pgAdmin
+- Service health dashboards
+
+**This repo is NOT for:**
+- Symphony Core services -> see [sc-infrastructure](https://github.com/symphonycore-org/sc-infrastructure)
+- Ansible-based deployments -> see [homelab-deploy](https://github.com/score-ra/homelab-deploy)
+- Device software provisioning -> see [device-deployments](https://github.com/score-ra/device-deployments)
+
+## Related Repos
+
+| Relationship | Repo |
+|-------------|------|
+| **Dependencies** | N/A |
+| **Dependents** | [snipeit-asset-management](https://github.com/score-ra/snipeit-asset-management), [ra-fasten-health](https://github.com/score-ra/ra-fasten-health), [ra-life-tracker](https://github.com/score-ra/ra-life-tracker) |
+| **Supersedes** | N/A |
+| **Superseded By** | N/A |
+
+---
+
 Central infrastructure repository for device inventory, network management, and multi-site organization support.
 
 ## Overview
