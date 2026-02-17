@@ -54,16 +54,6 @@ endpoints:
     ui:
       hide-hostname: true
 
-  - name: pgAdmin
-    group: Infrastructure
-    url: "http://ra_pgadmin:80"
-    interval: 60s
-    conditions:
-      - "[STATUS] == any(200, 302)"
-      - "[RESPONSE_TIME] < 5000"
-    ui:
-      hide-hostname: true
-
   - name: Event Log Database
     group: Infrastructure
     url: "tcp://ra_eventlog_db:5432"
@@ -90,16 +80,6 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 2000"
-    ui:
-      hide-hostname: true
-
-  - name: Label Service
-    group: Services
-    url: "http://ra_labels:8000/health"
-    interval: 60s
-    conditions:
-      - "[STATUS] == 200"
-      - "[RESPONSE_TIME] < 5000"
     ui:
       hide-hostname: true
 

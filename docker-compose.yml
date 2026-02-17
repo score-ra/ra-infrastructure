@@ -12,7 +12,6 @@
 #   - PostgreSQL 16 (event_log database)
 #   - Traefik (reverse proxy, host port 8070)
 #   - Gatus (monitoring)
-#   - pgAdmin 4 (database management)
 #
 # Usage:
 #   docker compose up -d
@@ -32,7 +31,6 @@ volumes:
   ra_fasten_cache:
   ra_fasten_certs:
   ra_gatus_data:
-  ra_pgadmin_data:
   ra_eventlog_postgres_data:
   ra_labels_data:
 
@@ -263,24 +261,3 @@ services:
         limits:
           memory: 128M
 
-  ra_pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: ra_pgadmin
-    restart: always
-    depends_on:
-      ra_postgres:
-        condition: service_healthy
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-      PGADMIN_LISTEN_PORT: 80
-    ports:
-      - "8084:80"
-    volumes:
-      - ra_pgadmin_data:/var/lib/pgadmin
-    networks:
-      - ra_network
-    deploy:
-      resources:
-        limits:
-          memory: 256M
