@@ -68,7 +68,7 @@ http:
     - 172.16.0.0/12
 ```
 
-**Tracking**: [ra-home-automation issue](https://github.com/score-ra/ra-home-automation) (assigned there for fix)
+**Tracking**: [ra-home-automation#11](https://github.com/score-ra/ra-home-automation/issues/11)
 
 **Repo**: `ra-home-automation`
 
