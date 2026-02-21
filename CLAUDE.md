@@ -9,8 +9,6 @@
 - Health check: `inv system selfcheck`
 
 # Session Management
-- Start: read `start-here.md` for current context
-- End: update `start-here.md` with completed tasks, files modified, next steps
 
 # Database Conventions
 - UUID primary keys, snake_case names
