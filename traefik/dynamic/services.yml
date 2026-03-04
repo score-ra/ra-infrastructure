@@ -50,24 +50,6 @@ http:
       middlewares:
         - cloudflare-headers
 
-    # Blue Iris - Security Cameras (external LAN device)
-    cameras-selfwize-router:
-      rule: "Host(`cameras.selfwize.com`)"
-      entryPoints:
-        - web
-      service: cameras-selfwize-service
-      middlewares:
-        - cloudflare-headers
-
-    # Home Assistant - Home Automation (external LAN device)
-    home-selfwize-router:
-      rule: "Host(`home.selfwize.com`)"
-      entryPoints:
-        - web
-      service: home-selfwize-service
-      middlewares:
-        - cloudflare-headers
-
     # Family Contacts (Gramps Web) - ra-life-tracker
     family-selfwize-router:
       rule: "Host(`family.selfwize.com`)"
@@ -108,28 +90,11 @@ http:
         servers:
           - url: "http://ra_eventlog:8000"
 
-    # Blue Iris: external on LAN (self-signed cert)
-    cameras-selfwize-service:
-      loadBalancer:
-        servers:
-          - url: "https://192.168.68.56:443"
-        serversTransport: insecureTransport@file
-
-    # Home Assistant: external on LAN
-    home-selfwize-service:
-      loadBalancer:
-        servers:
-          - url: "http://192.168.68.68:8123"
-
     # Family Contacts / Gramps Web: host-external
     family-selfwize-service:
       loadBalancer:
         servers:
           - url: "http://host.docker.internal:5000"
-
-  serversTransports:
-    insecureTransport:
-      insecureSkipVerify: true
 
   middlewares:
     # Cloudflare terminates TLS; tell backends the original protocol was HTTPS

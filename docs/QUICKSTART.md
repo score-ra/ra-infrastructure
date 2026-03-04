@@ -3,185 +3,158 @@
 ## Prerequisites
 
 - Docker Desktop installed and running
-- Python 3.11+ installed
-- pip (Python package manager)
+- Python 3.12+ installed (`C:\Program Files\Python312\`)
+- GitHub CLI (`gh`) authenticated
+- Sibling repos cloned: `snipeit-asset-management`, `ra-life-tracker`
+
+## Host: Raptor (Windows 11)
+
+- User: `ra-local` (`C:\Users\symph\`)
+- Workspace: `C:\Users\symph\workspace\personal\software\ra-infrastructure`
+- Connected via Tailscale (IP: `100.91.54.92`)
+- SMB share to BEAST: `Z:` → `\\100.103.212.60\netshare`
 
 ## Setup
 
-### 1. Start Database
+### 1. Docker PATH
+
+Docker Desktop must be running. Add to PATH if not already:
 
 ```powershell
-cd c:\Users\ranand\workspace\personal\software\ra-infrastructure\docker
-
-# Copy environment file
-copy .env.example .env
-
-# Start PostgreSQL and pgAdmin
-docker-compose up -d
-
-# Verify containers are running
-docker ps
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\Docker\Docker\resources\bin", "Machine")
 ```
 
-You should see:
-- `inventory-db` (PostgreSQL)
-- `inventory-pgadmin` (pgAdmin web UI)
+**Note:** Remote sessions (Tailscale SSH) cannot use the Docker credential store.
+Ensure `~\.docker\config.json` has `"credsStore": ""` and rename
+`docker-credential-desktop.exe` / `docker-credential-wincred.exe` in
+`C:\Program Files\Docker\Docker\resources\bin\` if pulls fail with
+"A specified logon session does not exist".
 
-### 2. Install CLI
+### 2. Build Local Images
+
+The `ra_eventlog` service uses a locally-built image:
 
 ```powershell
-cd c:\Users\ranand\workspace\personal\software\ra-infrastructure\cli
-
-# Create virtual environment (optional but recommended)
-python -m venv .venv
-.venv\Scripts\activate
-
-# Install in development mode
-pip install -e .
-
-# Verify installation
-inv --help
+cd C:\Users\symph\workspace\personal\software\ra-life-tracker
+docker build -t daily-event-log:latest .
 ```
 
-### 3. Initialize Database
+### 3. Sibling Repo .env Files
+
+Both sibling repos need `.env` files (not committed to git):
+
+- `../snipeit-asset-management/.env` — APP_KEY, MySQL creds, Snipe-IT API key
+- `../ra-life-tracker/.env` — PostgreSQL creds, Fasten/Gramps credentials
+
+### 4. Start Docker Stack
 
 ```powershell
-# Run migrations (creates tables)
+cd C:\Users\symph\workspace\personal\software\ra-infrastructure
+docker compose up -d
+docker compose ps
+```
+
+### 5. Install CLI
+
+```powershell
+cd cli
+pip install -e ".[dev]"
+```
+
+If `pip` is not in PATH:
+```powershell
+& "C:\Program Files\Python312\python.exe" -m pip install -e ".[dev]"
+```
+
+### 6. Initialize Database
+
+```powershell
 inv db migrate
-
-# Seed initial data
 inv db seed
-
-# Verify
-inv db stats
+inv db health
 ```
 
-### 4. Verify Installation
+### 7. Verify Services
 
 ```powershell
-# Run comprehensive health check
 inv system selfcheck
-
-# Check system status
-inv status
-
-# Verify database
-inv db stats
 ```
 
-### 5. Explore
+| Service | Local URL | Expected |
+|---------|-----------|----------|
+| Dashboard | http://localhost:8088 | 200 |
+| Snipe-IT | http://localhost:8083 | 200/302 |
+| Fasten | http://localhost:9091 | 200/302 |
+| Event Log | http://localhost:8089 | 200 |
+| Gatus | http://localhost:8085 | 200 |
+| Labels | http://localhost:8100/health | 200 |
+| Traefik | http://localhost:8070 | 404 (expected) |
+| PostgreSQL | `inv db health` | Healthy |
+
+## Cloudflare Tunnel
+
+The tunnel runs as a Windows service, routing `*.selfwize.com` → `localhost:8070` (Traefik).
+
+- Tunnel ID: `1f014ff9-68ae-4033-bacf-e058b91d2df4`
+- Config: `C:\Program Files (x86)\cloudflared\config.yml`
+- Credentials: `C:\Windows\System32\config\systemprofile\.cloudflared\`
 
 ```powershell
-# List organizations
-inv org list
+# Check service
+Get-Service cloudflared
 
-# List sites
-inv site list
+# Restart
+Stop-Process -Name "cloudflared" -Force; Start-Sleep 5; Start-Service cloudflared
 
-# List devices
-inv device list
-
-# Show device details
-inv device show homeseer-server
+# Manual test
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --config "C:\Program Files (x86)\cloudflared\config.yml" run
 ```
 
-## Access pgAdmin
+## Scheduled Tasks
 
-Open http://localhost:5050 in your browser:
-- Email: `admin@local.dev`
-- Password: (from your .env file)
+Three tasks are registered:
 
-Add server connection:
-- Host: `postgres` (or `host.docker.internal` on Windows)
-- Port: `5432`
-- Database: `inventory`
-- Username: `inventory`
-- Password: (from your .env file)
+| Task | Purpose |
+|------|---------|
+| `ra-infrastructure-startup` | Start Docker stack on login |
+| `ra-infrastructure-backup-daily` | Daily database backups |
+| `ra-infrastructure-backup-weekly` | Weekly full backups |
 
-## CLI Commands Overview
-
+```powershell
+Get-ScheduledTask -TaskName 'ra-infrastructure-*'
 ```
+
+## CLI Commands
+
+```powershell
 inv --help                    # Show all commands
-
-# System Health
-inv system selfcheck          # Comprehensive infrastructure health check
-inv system selfcheck -v       # Verbose output with details
-inv system check-endpoint <url>  # Test specific endpoint
-
-# Organizations
-inv org list                  # List organizations
-inv org show <slug>           # Show org details
-inv org create "Name"         # Create organization
-
-# Sites
-inv site list                 # List sites
-inv site list --org <slug>    # Filter by org
-inv site show <slug>          # Show site details
-inv site create "Name" --org <slug>
-
-# Devices
-inv device list               # List devices
-inv device list --site <slug> # Filter by site
-inv device show <slug>        # Show device details
-inv device count --by category
-inv device create "Name" --type switch --site <slug>
-
-# Networks
-inv network list              # List networks
-inv network show <slug>       # Show network details
-inv network types             # List network types
-
-# Database
-inv db stats                  # Show record counts
-inv db tables                 # List tables
-inv db health                 # Check PostgreSQL health
+inv system selfcheck          # Comprehensive health check
+inv db health                 # Database connectivity
+inv db stats                  # Record counts
 inv db migrate                # Run migrations
 inv db seed                   # Seed data
-inv db reset --yes            # Reset database
+inv device list               # List devices
+inv org list                  # List organizations
 ```
-
-## Next Steps
-
-1. Add your devices to the inventory
-2. Configure zones for your site
-3. Set up network records
-4. Import existing data from Home Assistant
 
 ## Troubleshooting
 
-### Quick Health Check
+### Docker credential errors on remote sessions
+Rename credential helpers in `C:\Program Files\Docker\Docker\resources\bin\`:
+- `docker-credential-desktop.exe` → `.bak`
+- `docker-credential-wincred.exe` → `.bak`
+
+Set `"credsStore": ""` in `~\.docker\config.json`.
+
+### Cloudflared service won't start
+Check the service binary path includes tunnel arguments:
 ```powershell
-# Run comprehensive check of all services
-inv system selfcheck
-
-# Check specific components
-inv db health                              # PostgreSQL only
-.\scripts\check-docker-health.ps1         # Docker daemon
+sc.exe qc cloudflared
 ```
+If `BINARY_PATH_NAME` is just `cloudflared.exe` without `tunnel run`, recreate the service with proper arguments.
 
-### Database connection failed
-- Run health check: `inv db health`
-- Ensure Docker containers are running: `docker ps`
-- Check .env file has correct credentials
-- Try resetting volumes:
-  ```powershell
-  cd docker
-  docker-compose down
-  docker volume rm inventory_postgres_data
-  docker-compose up -d
-  ```
-
-### CLI not found
-- Ensure virtual environment is activated
-- Reinstall: `pip install -e .`
-
-### Migrations failed
-- Reset database: `inv db reset --yes`
-- Check PostgreSQL logs: `docker logs inventory-db`
-
-### Docker not responding
+### Snipe-IT restart loop
+Check `../snipeit-asset-management/.env` has `APP_KEY=base64:...`. Recreate container after fixing:
 ```powershell
-.\scripts\check-docker-health.ps1 -AutoRestart
+docker compose up -d ra_snipeit --force-recreate
 ```
-
-**For detailed troubleshooting:** See [docs/SELF-CHECK.md](SELF-CHECK.md)

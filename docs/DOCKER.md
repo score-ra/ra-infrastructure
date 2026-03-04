@@ -1,317 +1,132 @@
 # Docker Infrastructure Guide
 
-This document describes the Docker containers used by ra-infrastructure and their purposes.
-
 ## Overview
 
-ra-infrastructure uses Docker Compose to manage three database containers that provide the data layer for device inventory, network management, and home automation logging.
+ra-infrastructure uses Docker Compose to run 10 containers on Raptor (Windows 11). All services share the `ra_network` bridge network.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Docker Environment                                  │
-│                                                                               │
-│  ┌──────────────────┐  ┌───────────────────┐  ┌──────────────────┐          │
-│  │   inventory-db   │  │ homeautomation-db │  │ inventory-pgadmin │          │
-│  │  (PostgreSQL 16) │  │   (MySQL 5.7)     │  │    (pgAdmin 4)    │          │
-│  │                  │  │                   │  │                   │          │
-│  │  Port: 5432      │  │   Port: 3306      │  │   Port: 5050      │          │
-│  │  CPU: 1.0 max    │  │   CPU: 1.0 max    │  │   CPU: 0.5 max    │          │
-│  │  RAM: 512M max   │  │   RAM: 512M max   │  │   RAM: 256M max   │          │
-│  └──────────────────┘  └───────────────────┘  └───────────────────┘          │
-│           │                     │                                             │
-│           ▼                     ▼                                             │
-│  ┌──────────────────┐  ┌───────────────────┐                                 │
-│  │ postgres_data    │  │   mysql_data      │  Named volumes for persistence  │
-│  └──────────────────┘  └───────────────────┘                                 │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                        Docker Compose Stack                        │
+│                                                                    │
+│  DATABASES           APPLICATIONS           INFRASTRUCTURE         │
+│  ┌──────────────┐   ┌──────────────────┐   ┌──────────────┐      │
+│  │ ra_postgres   │   │ ra_snipeit       │   │ ra_traefik   │      │
+│  │ (PG 16)      │   │ (Snipe-IT v8.3)  │   │ (Traefik v3) │      │
+│  │ :5433        │   │ :8083            │   │ :8070        │      │
+│  ├──────────────┤   ├──────────────────┤   ├──────────────┤      │
+│  │ ra_mysql      │   │ ra_fasten        │   │ ra_gatus     │      │
+│  │ (MySQL 8.0)  │   │ (Fasten Health)  │   │ (Monitoring) │      │
+│  │ :3307        │   │ :9091            │   │ :8085        │      │
+│  ├──────────────┤   ├──────────────────┤   └──────────────┘      │
+│  │ ra_eventlog_db│   │ ra_eventlog      │                         │
+│  │ (PG 16)      │   │ (Event Log)      │                         │
+│  │ :5434        │   │ :8089            │                         │
+│  └──────────────┘   ├──────────────────┤                         │
+│                     │ ra_labels         │                         │
+│                     │ (Label Service)   │                         │
+│                     │ :8100            │                         │
+│                     ├──────────────────┤                         │
+│                     │ ra_dashboard      │                         │
+│                     │ (nginx)          │                         │
+│                     │ :8088            │                         │
+│                     └──────────────────┘                         │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Containers
 
-### inventory-db (PostgreSQL 16)
+| Container | Image | Port | Purpose | Depends On |
+|-----------|-------|------|---------|------------|
+| ra_postgres | postgres:16-alpine | 5433 | Inventory database | — |
+| ra_mysql | mysql:8.0 | 3307 | Snipe-IT database | — |
+| ra_eventlog_db | postgres:16-alpine | 5434 | Event Log database | — |
+| ra_snipeit | snipe/snipe-it:v8.3.7 | 8083 | Asset management | ra_mysql |
+| ra_fasten | ghcr.io/fastenhealth/fasten-onprem:main | 9091 | Health records | — |
+| ra_eventlog | daily-event-log:latest (local build) | 8089 | Event tracking | ra_eventlog_db |
+| ra_labels | Built from snipeit-asset-management | 8100 | QR label service | — |
+| ra_dashboard | nginx:alpine | 8088 | Service directory | — |
+| ra_traefik | traefik:v3.2 | 8070 | Reverse proxy | — |
+| ra_gatus | twinproduction/gatus:latest | 8085 | Status monitoring | — |
 
-| Property | Value |
-|----------|-------|
-| **Image** | `postgres:16-alpine` |
-| **Container Name** | `inventory-db` |
-| **Purpose** | Primary database for all device, network, and organization data |
-| **Port** | `5432` (host) → `5432` (container) |
-| **Restart Policy** | `unless-stopped` |
+## Locally-Built Images
 
-**Purpose:**
-- Stores all inventory data (organizations, sites, zones, devices, networks)
-- Provides the data layer consumed by external repositories
-- Runs migrations automatically on first start via `/docker-entrypoint-initdb.d`
+Two services use images not from a registry:
 
-**Resource Limits:**
-- CPU: 1.0 core max, 0.25 core reserved
-- Memory: 512MB max, 128MB reserved
+- **ra_eventlog** — `daily-event-log:latest`, built from `../ra-life-tracker/Dockerfile`
+- **ra_labels** — built from `../snipeit-asset-management/src/label-service/Dockerfile`
 
-**Health Check:**
-- Command: `pg_isready -U inventory`
-- Interval: 10 seconds
-- Timeout: 5 seconds
-- Retries: 5
-
-**Volumes:**
-- `inventory_postgres_data` → `/var/lib/postgresql/data` (persistent data)
-- `../database/migrations` → `/docker-entrypoint-initdb.d` (read-only, init scripts)
-
-### homeautomation-db (MySQL 5.7)
-
-| Property | Value |
-|----------|-------|
-| **Image** | `mysql:5.7` |
-| **Container Name** | `homeautomation-db` |
-| **Purpose** | Database for home automation systems to log device state changes |
-| **Port** | `3306` (host) → `3306` (container) |
-| **Restart Policy** | `unless-stopped` |
-
-**Purpose:**
-- Provides a MySQL database for home automation systems
-- Home automation apps create their own tables in this database
-- Separate from the main inventory database for isolation
-
-**Why MySQL 5.7 (not 8.0):**
-MySQL 5.7 is used instead of 8.0 for compatibility with legacy home automation connectors. MySQL 8.0 introduced:
-- `caching_sha2_password` as the default authentication plugin (older connectors only support `mysql_native_password`)
-- `utf8mb3` charset naming (older connectors don't recognize this alias)
-
-These incompatibilities cause authentication failures and charset errors with legacy applications.
-
-**Resource Limits:**
-- CPU: 1.0 core max, 0.25 core reserved
-- Memory: 512MB max, 128MB reserved
-
-**Health Check:**
-- Command: `mysqladmin ping -h localhost`
-- Interval: 10 seconds
-- Timeout: 5 seconds
-- Retries: 5
-
-**Volumes:**
-- `homeautomation_mysql_data` → `/var/lib/mysql` (persistent data)
-
-**Server Configuration:**
-- `--character-set-server=utf8mb4` - UTF-8 character set
-- `--collation-server=utf8mb4_general_ci` - Case-insensitive collation
-
-**Default Credentials:**
-- Database: `homeautomation`
-- User: `homeautomation`
-- Password: `homeautomation_dev_password`
-- Root Password: `mysql_root_dev_password`
-
-### inventory-pgadmin (pgAdmin 4)
-
-| Property | Value |
-|----------|-------|
-| **Image** | `dpage/pgadmin4:latest` |
-| **Container Name** | `inventory-pgadmin` |
-| **Purpose** | Web-based database administration interface |
-| **Port** | `5050` (host) → `80` (container) |
-| **Restart Policy** | `unless-stopped` |
-
-**Purpose:**
-- Provides a web UI for database administration at `http://localhost:5050`
-- Useful for manual queries, schema inspection, and debugging
-- Optional for production use (can be disabled)
-
-**Resource Limits:**
-- CPU: 0.5 core max, 0.1 core reserved
-- Memory: 256MB max, 64MB reserved
-
-**Dependencies:**
-- Waits for `inventory-db` to be healthy before starting
-
-**Default Credentials:**
-- Email: `admin@local.dev`
-- Password: `admin_dev_password` (change via `.env`)
-
-## Network
-
-| Property | Value |
-|----------|-------|
-| **Network Name** | `inventory_network` |
-| **Type** | Bridge (default) |
-
-All containers communicate over `inventory_network`. From within pgAdmin, connect to PostgreSQL using hostname `postgres` (Docker DNS).
-
-## Volumes
-
-| Volume Name | Purpose | Container Path |
-|-------------|---------|----------------|
-| `inventory_postgres_data` | PostgreSQL data persistence | `/var/lib/postgresql/data` |
-| `homeautomation_mysql_data` | MySQL data persistence | `/var/lib/mysql` |
-| `inventory_pgadmin_data` | pgAdmin configuration/sessions | `/var/lib/pgadmin` |
-
-**Important:** These volumes persist data across container restarts and rebuilds. To completely reset a database, you must remove its volume:
-
+Rebuild after code changes:
 ```powershell
-docker-compose down -v  # WARNING: Deletes all data
+# Event log
+cd ..\ra-life-tracker && docker build -t daily-event-log:latest .
+
+# Labels (rebuilt automatically by docker compose)
+docker compose build ra_labels
 ```
 
-## Environment Variables
+## Environment Files
 
-Configure via `docker/.env` file (copy from `.env.example`):
-
-### PostgreSQL
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `POSTGRES_DB` | `inventory` | Database name |
-| `POSTGRES_USER` | `inventory` | Database user |
-| `POSTGRES_PASSWORD` | `inventory_dev_password` | Database password |
-| `POSTGRES_PORT` | `5432` | Host port for PostgreSQL |
-
-### MySQL (Home Automation)
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MYSQL_DATABASE` | `homeautomation` | Database name |
-| `MYSQL_USER` | `homeautomation` | Database user |
-| `MYSQL_PASSWORD` | `homeautomation_dev_password` | Database password |
-| `MYSQL_ROOT_PASSWORD` | `mysql_root_dev_password` | Root password |
-| `MYSQL_PORT` | `3306` | Host port for MySQL |
-
-### pgAdmin
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PGADMIN_EMAIL` | `admin@local.dev` | pgAdmin login email |
-| `PGADMIN_PASSWORD` | `admin_dev_password` | pgAdmin login password |
-| `PGADMIN_PORT` | `5050` | Host port for pgAdmin |
+| File | Purpose | Git Status |
+|------|---------|------------|
+| `.env` | Secrets (DB passwords, SMTP) | git-ignored |
+| `config/infrastructure.env` | Topology (ports, container names, paths) | tracked |
+| `../snipeit-asset-management/.env` | Snipe-IT APP_KEY, MySQL creds | git-ignored |
+| `../ra-life-tracker/.env` | Event log DB creds, Fasten/Gramps creds | git-ignored |
 
 ## Common Operations
 
-### Start Services
+### Start / Stop
 ```powershell
-cd docker
-docker-compose up -d
+docker compose up -d          # Start all
+docker compose down            # Stop all
+docker compose restart         # Restart all
+docker compose restart ra_postgres  # Restart one
 ```
 
-### Stop Services
+### Logs
 ```powershell
-cd docker
-docker-compose down
+docker compose logs -f                 # All services
+docker compose logs -f ra_snipeit      # Specific service
+docker compose logs --tail 50 ra_traefik
 ```
 
-### View Logs
+### Status
 ```powershell
-# All services
-docker-compose logs -f
-
-# Specific service
-docker-compose logs -f postgres
-docker-compose logs -f pgadmin
+docker compose ps              # Container status
+docker system df               # Disk usage
 ```
 
-### Check Status
+### Rebuild
 ```powershell
-docker-compose ps
-
-# Or via CLI
-inv db stats
+docker compose up -d --build ra_labels    # Rebuild and restart
+docker compose up -d --force-recreate     # Recreate all containers
 ```
 
-### Restart Services
-```powershell
-docker-compose restart
+## Volumes
 
-# Specific service
-docker-compose restart postgres
-```
+| Volume | Container | Purpose |
+|--------|-----------|---------|
+| ra_postgres_data | ra_postgres | Inventory DB data |
+| ra_mysql_data | ra_mysql | Snipe-IT DB data |
+| ra_eventlog_postgres_data | ra_eventlog_db | Event Log DB data |
+| ra_snipeit_data | ra_snipeit | Snipe-IT uploads |
+| ra_snipeit_logs | ra_snipeit | Snipe-IT logs |
+| ra_fasten_db | ra_fasten | Fasten Health DB |
+| ra_fasten_cache | ra_fasten | Fasten cache |
+| ra_fasten_certs | ra_fasten | Fasten certs |
+| ra_gatus_data | ra_gatus | Gatus state |
+| ra_labels_data | ra_labels | Label DB |
 
-### Reset Database (destructive)
-```powershell
-docker-compose down -v
-docker-compose up -d
-inv db migrate
-inv db seed
-```
+**Warning:** `docker compose down -v` deletes all volumes and data.
 
-## Connecting to the Databases
+## Network
 
-### PostgreSQL (Inventory)
+All containers communicate on `ra_network` (bridge). Use container names as hostnames for inter-container communication (e.g., `ra_postgres`, `ra_mysql`).
 
-**From Host Machine:**
-```
-Host: localhost
-Port: 5432
-Database: ra_inventory
-User: inventory
-Password: inventory_dev_password
-```
+## Remote Session Notes (Tailscale SSH)
 
-**From Another Docker Container:**
-```
-Host: postgres (or inventory-db)
-Port: 5432
-Database: ra_inventory
-User: inventory
-Password: inventory_dev_password
-```
+Docker Desktop's credential helpers (`docker-credential-desktop.exe`, `docker-credential-wincred.exe`) fail over remote sessions because they require the Windows DPAPI logon session. Workaround:
 
-**From pgAdmin Web UI:**
-1. Open `http://localhost:5050`
-2. Login with pgAdmin credentials
-3. Add server with:
-   - Host: `postgres`
-   - Port: `5432`
-   - Database: `ra_inventory`
-   - User: `inventory`
-
-### MySQL (Home Automation)
-
-**From Host Machine:**
-```
-Host: localhost
-Port: 3306
-Database: homeautomation
-User: homeautomation
-Password: homeautomation_dev_password
-```
-
-**Connection String:**
-```
-mysql://homeautomation:homeautomation_dev_password@localhost:3306/homeautomation
-```
-
-**From Another Docker Container:**
-```
-Host: homeautomation-db
-Port: 3306
-Database: homeautomation
-User: homeautomation
-Password: homeautomation_dev_password
-```
-
-## Troubleshooting
-
-### Container Won't Start
-```powershell
-# Check logs for errors
-docker-compose logs postgres
-
-# Check if port is in use
-netstat -an | findstr 5432
-```
-
-### Database Connection Refused
-```powershell
-# Verify container is running and healthy
-docker-compose ps
-
-# Check health status
-docker inspect inventory-db --format='{{.State.Health.Status}}'
-```
-
-### Out of Disk Space
-```powershell
-# Check Docker disk usage
-docker system df
-
-# Clean up unused resources
-docker system prune
-```
-
-### pgAdmin Can't Connect to Database
-- Use hostname `postgres` (not `localhost`) when connecting from pgAdmin
-- Ensure the database container is healthy before pgAdmin starts
+1. Rename credential helpers to `.bak` in `C:\Program Files\Docker\Docker\resources\bin\`
+2. Set `"credsStore": ""` in `~\.docker\config.json`
+3. Docker Desktop may reset `config.json` on restart — re-apply after reboot

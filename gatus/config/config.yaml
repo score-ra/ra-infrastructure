@@ -109,28 +109,6 @@ endpoints:
     ui:
       hide-hostname: true
 
-  - name: cameras.selfwize.com
-    group: External
-    url: "https://cameras.selfwize.com"
-    interval: 60s
-    conditions:
-      - "[STATUS] == any(200, 302, 401)"
-      - "[RESPONSE_TIME] < 10000"
-      - "[CERTIFICATE_EXPIRATION] > 168h"
-    ui:
-      hide-hostname: true
-
-  - name: home.selfwize.com
-    group: External
-    url: "https://home.selfwize.com"
-    interval: 60s
-    conditions:
-      - "[STATUS] == any(200, 302, 401)"
-      - "[RESPONSE_TIME] < 5000"
-      - "[CERTIFICATE_EXPIRATION] > 168h"
-    ui:
-      hide-hostname: true
-
   - name: events.selfwize.com
     group: External
     url: "https://events.selfwize.com"

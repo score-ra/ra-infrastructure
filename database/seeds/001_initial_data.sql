@@ -137,7 +137,7 @@ INSERT INTO networks (id, site_id, name, slug, network_type, channel, metadata) 
 -- HomeSeer Server
 INSERT INTO devices (
     id, site_id, zone_id, network_id, name, slug, device_type, category_id,
-    manufacturer, model, ip_address, hostname, status, homeseer_ref, is_controller, metadata
+    manufacturer, model, ip_address, hostname, status, is_controller, metadata
 ) VALUES (
     'e0000000-0000-0000-0000-000000000001',
     'b0000000-0000-0000-0000-000000000001',
@@ -152,7 +152,6 @@ INSERT INTO devices (
     '192.168.68.56',
     'homeseer',
     'online',
-    'HS4-SERVER',
     TRUE,
     '{"version": "4.2.22.4", "os": "Windows 11", "port": 80}'
 );

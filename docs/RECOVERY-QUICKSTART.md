@@ -1,12 +1,13 @@
 # Recovery Quick Reference
 
-**One-page guide for common recovery scenarios**
+**One-page guide for common recovery scenarios on Raptor**
 
 ---
 
 ## Quick Health Check (Start Here!)
 
 ```powershell
+cd C:\Users\symph\workspace\personal\software\ra-infrastructure
 inv system selfcheck
 ```
 
@@ -19,11 +20,12 @@ This checks **everything**: Docker, databases, external endpoints, and more.
 | Symptom | Likely Cause | Quick Fix |
 |---------|--------------|-----------|
 | `inv system selfcheck` fails | Multiple issues | Check specific failures in output |
-| `inv db health` shows error | Container stopped | `docker-compose restart postgres` |
+| `inv db health` shows error | Container stopped | `docker compose restart ra_postgres` |
 | Docker whale icon missing | Docker not running | Start Docker Desktop from Start Menu |
-| External sites down (*.selfwize.com) | Cloudflare tunnel issue | Check cloudflared service |
-| Data is corrupted/deleted | Database issue | Use restore.ps1 (see below) |
-| Computer is new/rebuilt | Starting fresh | Follow Tier 4 in DR-RUNBOOK.md |
+| External sites down (*.selfwize.com) | Cloudflare tunnel issue | `Get-Service cloudflared` then restart |
+| Snipe-IT restart loop | Missing APP_KEY | Check `../snipeit-asset-management/.env` |
+| Docker pull fails | Credential helper issue | See QUICKSTART.md troubleshooting |
+| Computer is new/rebuilt | Starting fresh | Follow QUICKSTART.md |
 
 ---
 
@@ -31,27 +33,40 @@ This checks **everything**: Docker, databases, external endpoints, and more.
 
 ### Check Status
 ```powershell
-# Comprehensive check (recommended)
+cd C:\Users\symph\workspace\personal\software\ra-infrastructure
+
+# Comprehensive check
 inv system selfcheck
 
-# Check Docker containers
-cd c:\Users\ranand\workspace\personal\software\ra-infrastructure\docker
-docker-compose ps
+# Docker containers
+docker compose ps
 
-# Check database
+# Database
 inv db health
 inv db stats
+
+# Cloudflare tunnel
+Get-Service cloudflared
+
+# Scheduled tasks
+Get-ScheduledTask -TaskName 'ra-infrastructure-*'
 ```
 
-### Restart Container
+### Restart Services
 ```powershell
-docker-compose restart postgres
+# Single container
+docker compose restart ra_postgres
+
+# All containers
+docker compose restart
+
+# Cloudflare tunnel
+Stop-Process -Name "cloudflared" -Force; Start-Sleep 5; Start-Service cloudflared
 ```
 
 ### Restore from Backup
 ```powershell
-cd c:\Users\ranand\workspace\personal\software\ra-infrastructure
-.\scripts\restore.ps1 -BackupFile "D:\Backups\ra-infrastructure\daily\inventory_YYYY-MM-DD.dump.gz"
+.\scripts\restore.ps1 -BackupFile "C:\ra-infrastructure-local-backup\inventory\inventory_YYYY-MM-DD.dump.gz"
 ```
 
 ### Create Manual Backup
@@ -66,32 +81,17 @@ cd c:\Users\ranand\workspace\personal\software\ra-infrastructure
 ### PostgreSQL (Inventory)
 | Location | What's There |
 |----------|--------------|
-| `D:\Backups\ra-infrastructure\daily\` | Last 30 days of backups |
-| Google Drive: `ra-infrastructure-backup/` | Last 6 months of backups |
+| `C:\ra-infrastructure-local-backup\inventory\` | Daily backups |
 
-### MySQL (Home Automation)
+### MySQL (Snipe-IT)
 | Location | What's There |
 |----------|--------------|
-| `D:\Backups\homeautomation-mysql\daily\` | Last 30 days of backups |
-| Google Drive: `ra-infrastructure-backup/mysql/` | Last 6 months of backups |
+| `C:\ra-infrastructure-local-backup\mysql\` | Daily backups |
 
-**List local backups:**
-```powershell
-# PostgreSQL
-dir D:\Backups\ra-infrastructure\daily\ | Sort-Object LastWriteTime -Descending
-
-# MySQL
-dir D:\Backups\homeautomation-mysql\daily\ | Sort-Object LastWriteTime -Descending
-```
-
----
-
-## Emergency Contacts
-
-| Role | Contact |
-|------|---------|
-| Primary Admin | TBD |
-| Backup Admin | TBD |
+### Fasten Health
+| Location | What's There |
+|----------|--------------|
+| `C:\ra-infrastructure-local-backup\fasten\` | Daily backups |
 
 ---
 
@@ -99,6 +99,8 @@ dir D:\Backups\homeautomation-mysql\daily\ | Sort-Object LastWriteTime -Descendi
 
 | Document | Purpose |
 |----------|---------|
+| [QUICKSTART.md](QUICKSTART.md) | Full setup guide for Raptor |
 | [SELF-CHECK.md](SELF-CHECK.md) | Comprehensive health check guide |
 | [DR-RUNBOOK.md](DR-RUNBOOK.md) | Detailed disaster recovery procedures |
-| [database-monitoring.md](guides/database-monitoring.md) | Database-specific monitoring |
+| [ports-in-use.md](ports-in-use.md) | Port assignments |
+| [guides/database-monitoring.md](guides/database-monitoring.md) | Database-specific monitoring |

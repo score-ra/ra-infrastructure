@@ -15,24 +15,10 @@
       "status": "active"
     },
     {
-      "name": "Blue Iris",
-      "description": "Security Cameras",
-      "url": "https://cameras.selfwize.com",
-      "icon": "📹",
-      "status": "active"
-    },
-    {
       "name": "Daily Event Log",
       "description": "Personal Event Tracking",
       "url": "https://events.selfwize.com",
       "icon": "📅",
-      "status": "active"
-    },
-    {
-      "name": "Home Assistant",
-      "description": "Home Automation",
-      "url": "https://home.selfwize.com",
-      "icon": "🏠",
       "status": "active"
     },
     {
@@ -43,10 +29,10 @@
       "status": "active"
     },
     {
-      "name": "pgAdmin",
-      "description": "Database Management",
-      "url": "http://localhost:8084",
-      "icon": "🗄️",
+      "name": "Labels",
+      "description": "QR Label Management",
+      "url": "https://labels.selfwize.com",
+      "icon": "🏷️",
       "status": "active"
     }
   ]
