@@ -42,7 +42,7 @@ services:
   ra_postgres:
     image: postgres:16-alpine
     container_name: ra_postgres
-    restart: always
+    restart: "no"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -67,7 +67,7 @@ services:
   ra_mysql:
     image: mysql:8.0
     container_name: ra_mysql
-    restart: always
+    restart: "no"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: snipeit
@@ -92,7 +92,7 @@ services:
   ra_eventlog_db:
     image: postgres:16-alpine
     container_name: ra_eventlog_db
-    restart: always
+    restart: "no"
     environment:
       POSTGRES_USER: eventlog
       POSTGRES_PASSWORD: ${EVENTLOG_DB_PASSWORD:-eventlog_secret}
@@ -120,7 +120,7 @@ services:
   ra_snipeit:
     image: snipe/snipe-it:v8.3.7
     container_name: ra_snipeit
-    restart: always
+    restart: "no"
     depends_on:
       ra_mysql:
         condition: service_healthy
@@ -141,7 +141,7 @@ services:
   ra_fasten:
     image: ghcr.io/fastenhealth/fasten-onprem:main
     container_name: ra_fasten
-    restart: always
+    restart: "no"
     ports:
       - "9091:8080"
     volumes:
@@ -159,7 +159,7 @@ services:
   ra_eventlog:
     image: daily-event-log:latest
     container_name: ra_eventlog
-    restart: always
+    restart: "no"
     depends_on:
       ra_eventlog_db:
         condition: service_healthy
@@ -185,7 +185,7 @@ services:
       context: ../snipeit-asset-management/src/label-service
       dockerfile: Dockerfile
     container_name: ra_labels
-    restart: always
+    restart: "no"
     environment:
       - LABEL_SERVICE_ENV=production
       - LABEL_SERVICE_DB_PATH=/data/labels.db
@@ -213,7 +213,7 @@ services:
   ra_dashboard:
     image: nginx:alpine
     container_name: ra_dashboard
-    restart: always
+    restart: "no"
     ports:
       - "8088:80"
     volumes:
@@ -232,7 +232,7 @@ services:
   ra_traefik:
     image: traefik:v3.2
     container_name: ra_traefik
-    restart: always
+    restart: "no"
     ports:
       - "8070:80"
     volumes:
@@ -248,7 +248,7 @@ services:
   ra_gatus:
     image: twinproduction/gatus:latest
     container_name: ra_gatus
-    restart: always
+    restart: "no"
     ports:
       - "8085:8080"
     volumes:
