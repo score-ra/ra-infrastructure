@@ -12,7 +12,7 @@
 - User: `ra-local` (`C:\Users\symph\`)
 - Workspace: `C:\Users\symph\workspace\personal\software\ra-infrastructure`
 - Connected via Tailscale (IP: `100.91.54.92`)
-- SMB share to BEAST: `Z:` → `\\100.103.212.60\netshare`
+- SMB share to old PC: `Z:` → `\\100.103.212.60\netshare`
 
 ## Setup
 

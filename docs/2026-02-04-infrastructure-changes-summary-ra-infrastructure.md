@@ -1,7 +1,7 @@
 # Infrastructure Changes Summary — ra-infrastructure
 
 > Date: 2026-02-04
-> Scope: selfwize.com vertical — standalone deployment on BEAST (192.168.68.74)
+> Scope: selfwize.com vertical — standalone deployment on Raptor
 > Context: [Full migration summary](../../../device-deployments/docs/2026-02-04-infrastructure-changes-summary.md) in `device-deployments` repo
 
 ---
@@ -95,9 +95,9 @@ ra-infrastructure was separated out of sc-infrastructure into its own standalone
 |---------|-------|
 | `*.selfwize.com` routing, DNS, tunnel | ra-infrastructure |
 | `*.symphonycorelabs.com` routing, DNS, tunnel | sc-infrastructure |
-| BEAST host-level concerns (Docker, networking) | Shared — coordinate |
+| Raptor host-level concerns (Docker, networking) | Shared — coordinate |
 | Cloudflare account (both zones) | Shared — coordinate |
-| Port allocation on BEAST | Shared — coordinate (see port table above) |
+| Port allocation on Raptor | Shared — coordinate (see port table above) |
 
 ### Infrastructure Issue Resolution
 
@@ -121,7 +121,7 @@ Before this infrastructure is considered production-ready, conduct a repo health
 - [ ] All 14 Gatus endpoints green (`http://localhost:8085`)
 - [ ] Database connectivity verified (PG :5433, PG :5434, MySQL :3307)
 - [ ] Cloudflare tunnel stable (`cloudflared-selfwize` Windows service running)
-- [ ] External URLs reachable (test from outside BEAST network)
+- [ ] External URLs reachable (test from outside Raptor network)
 - [ ] `.env` file present with all required credentials
 - [ ] Data integrity confirmed (Snipe-IT assets, inventory records, event log entries)
 - [ ] Backup strategy defined for all databases

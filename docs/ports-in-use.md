@@ -37,4 +37,4 @@ Routed through Traefik via `host.docker.internal`.
 
 ## Out of Scope (Raptor)
 
-Blue Iris and Home Assistant run on BEAST (LAN only, not reachable from Raptor via Tailscale). They are not part of the Raptor infrastructure stack.
+Blue Iris and Home Assistant run on the old PC (LAN only, not reachable from Raptor via Tailscale). They are not part of the Raptor infrastructure stack.
