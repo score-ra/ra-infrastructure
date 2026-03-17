@@ -6,8 +6,8 @@
 
 .DESCRIPTION
     Creates Windows Task Scheduler tasks for:
-    - Daily backup at 2:00 AM
-    - Weekly backup on Sundays at 3:00 AM
+    - Backup every 12 hours (2:00 AM and 2:00 PM) with all databases
+    - Weekly backup on Sundays at 3:00 AM with Google Drive upload
 
 .PARAMETER Uninstall
     Remove the scheduled tasks instead of installing them.
@@ -76,13 +76,14 @@ function Install-DailyBackupTask {
         Unregister-ScheduledTask -TaskName $DailyTaskName -Confirm:$false
     }
 
-    # Create action
+    # Create action - includes all databases
     $action = New-ScheduledTaskAction `
         -Execute "powershell.exe" `
-        -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -Type daily -Verify"
+        -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -Type daily -Verify -IncludeMySQL -IncludeLabels"
 
-    # Create trigger - daily at 2:00 AM
-    $trigger = New-ScheduledTaskTrigger -Daily -At "2:00 AM"
+    # Create triggers - every 12 hours (2:00 AM and 2:00 PM)
+    $trigger1 = New-ScheduledTaskTrigger -Daily -At "2:00 AM"
+    $trigger2 = New-ScheduledTaskTrigger -Daily -At "2:00 PM"
 
     # Create settings
     $settings = New-ScheduledTaskSettingsSet `
@@ -102,12 +103,12 @@ function Install-DailyBackupTask {
         Register-ScheduledTask `
             -TaskName $DailyTaskName `
             -Action $action `
-            -Trigger $trigger `
+            -Trigger @($trigger1, $trigger2) `
             -Settings $settings `
             -Principal $principal `
-            -Description "Daily database backup for ra-infrastructure. Runs at 2:00 AM with verification."
+            -Description "Database backup for ra-infrastructure (all DBs). Runs every 12 hours (2:00 AM and 2:00 PM) with verification."
 
-        Write-Status "Task '$DailyTaskName' installed successfully" -Type Success
+        Write-Status "Task '$DailyTaskName' installed successfully (12-hour cycle)" -Type Success
     }
     catch {
         Write-Status "Failed to install task: $_" -Type Error
@@ -127,10 +128,10 @@ function Install-WeeklyBackupTask {
         Unregister-ScheduledTask -TaskName $WeeklyTaskName -Confirm:$false
     }
 
-    # Create action
+    # Create action - includes all databases
     $action = New-ScheduledTaskAction `
         -Execute "powershell.exe" `
-        -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -Type weekly -Verify"
+        -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -Type weekly -Verify -IncludeMySQL -IncludeLabels"
 
     # Create trigger - Sundays at 3:00 AM
     $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At "3:00 AM"
@@ -156,7 +157,7 @@ function Install-WeeklyBackupTask {
             -Trigger $trigger `
             -Settings $settings `
             -Principal $principal `
-            -Description "Weekly database backup for ra-infrastructure. Runs Sundays at 3:00 AM with Google Drive upload."
+            -Description "Weekly database backup for ra-infrastructure (all DBs). Runs Sundays at 3:00 AM with Google Drive upload."
 
         Write-Status "Task '$WeeklyTaskName' installed successfully" -Type Success
     }
@@ -230,15 +231,15 @@ else {
     if ($success) {
         Write-Host ""
         Write-Host "Backup Schedule:"
-        Write-Host "  Daily:  2:00 AM (local backup with verification)"
-        Write-Host "  Weekly: Sunday 3:00 AM (Google Drive upload)"
+        Write-Host "  Every 12h: 2:00 AM + 2:00 PM (all DBs, local backup with verification)"
+        Write-Host "  Weekly:    Sunday 3:00 AM (all DBs, Google Drive upload)"
         Write-Host ""
         Write-Host "To view tasks:"
         Write-Host "  Get-ScheduledTask -TaskName 'ra-infrastructure-backup-*'"
         Write-Host ""
         Write-Host "To run manually:"
-        Write-Host "  .\backup.ps1 -Type daily"
-        Write-Host "  .\backup.ps1 -Type weekly"
+        Write-Host "  .\backup.ps1 -Type daily -IncludeMySQL -IncludeLabels"
+        Write-Host "  .\backup.ps1 -Type weekly -IncludeMySQL -IncludeLabels"
         Write-Host ""
         Write-Host "To uninstall:"
         Write-Host "  .\install-backup-tasks.ps1 -Uninstall"

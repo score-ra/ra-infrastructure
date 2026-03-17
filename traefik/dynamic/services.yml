@@ -50,6 +50,15 @@ http:
       middlewares:
         - cloudflare-headers
 
+    # Label Service - QR Label Management
+    labels-selfwize-router:
+      rule: "Host(`labels.selfwize.com`)"
+      entryPoints:
+        - web
+      service: labels-selfwize-service
+      middlewares:
+        - cloudflare-headers
+
     # Family Contacts (Gramps Web) - ra-life-tracker
     family-selfwize-router:
       rule: "Host(`family.selfwize.com`)"
@@ -89,6 +98,12 @@ http:
       loadBalancer:
         servers:
           - url: "http://ra_eventlog:8000"
+
+    # Label Service: Docker container on ra_network
+    labels-selfwize-service:
+      loadBalancer:
+        servers:
+          - url: "http://ra_labels:8000"
 
     # Family Contacts / Gramps Web: host-external
     family-selfwize-service:

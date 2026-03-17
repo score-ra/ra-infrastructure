@@ -20,7 +20,10 @@
     Also backup Fasten Health data (SQLite database, certs, config, encryption key).
 
 .PARAMETER IncludeMySQL
-    Also backup MySQL (home automation) database.
+    Also backup MySQL (Snipe-IT) database.
+
+.PARAMETER IncludeLabels
+    Also backup Label Service (SQLite database via VACUUM INTO).
 
 .PARAMETER FastenOnly
     Only backup Fasten Health, skip ra-infrastructure database.
@@ -51,6 +54,9 @@
 
 .EXAMPLE
     .\backup.ps1 -Type weekly -IncludeFasten -IncludeMySQL
+
+.EXAMPLE
+    .\backup.ps1 -Type daily -IncludeMySQL -IncludeLabels
 #>
 
 [CmdletBinding()]
@@ -62,6 +68,7 @@ param(
     [switch]$Verify,
     [switch]$IncludeFasten,
     [switch]$IncludeMySQL,
+    [switch]$IncludeLabels,
     [switch]$FastenOnly,
     [switch]$Force,
 
@@ -131,6 +138,10 @@ $script:FastenContainer = $env:RA_FASTEN_CONTAINER
 $script:FastenBackupDir = $env:RA_FASTEN_BACKUP_DIR
 $script:FastenDbPath = "/opt/fasten/db"
 $script:FastenCertsPath = "/opt/fasten/certs/shared"
+
+# Label Service settings (from infrastructure config)
+$script:LabelsContainer = $env:RA_LABELS_CONTAINER
+$script:LabelsBackupDir = $env:RA_LABELS_BACKUP_DIR
 
 # Find rclone in common locations and add to PATH if needed
 function Find-Rclone {
@@ -1090,6 +1101,220 @@ function Invoke-FastenWeeklyBackup {
 
 #endregion
 
+#region Label Service Backup Functions
+
+function Test-LabelsPrerequisites {
+    Write-Log "Checking Label Service prerequisites..." -Level INFO
+
+    # Check Docker is running
+    try {
+        docker info 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Docker is not running" -Level ERROR
+            return $false
+        }
+    }
+    catch {
+        Write-Log "Docker is not installed or not in PATH" -Level ERROR
+        return $false
+    }
+
+    # Check container is running
+    $state = docker inspect --format='{{.State.Running}}' $script:LabelsContainer 2>&1
+    if ($LASTEXITCODE -ne 0 -or $state -ne "true") {
+        Write-Log "Container '$script:LabelsContainer' is not running" -Level ERROR
+        return $false
+    }
+
+    # Verify database exists inside container
+    $dbCheck = docker exec $script:LabelsContainer test -f /data/labels.db 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Log "Labels database not found inside container at /data/labels.db" -Level ERROR
+        return $false
+    }
+
+    # Check backup directory
+    if (-not (Test-Path $script:LabelsBackupDir)) {
+        Write-Log "Creating Labels backup directory: $script:LabelsBackupDir" -Level INFO
+        New-Item -ItemType Directory -Path $script:LabelsBackupDir -Force | Out-Null
+    }
+
+    $dailyDir = Join-Path $script:LabelsBackupDir "daily"
+    if (-not (Test-Path $dailyDir)) {
+        New-Item -ItemType Directory -Path $dailyDir -Force | Out-Null
+    }
+
+    Write-Log "Label Service prerequisites check passed" -Level SUCCESS
+    return $true
+}
+
+function New-LabelsBackup {
+    $date = Get-Date -Format "yyyy-MM-dd"
+    $dailyDir = Join-Path $script:LabelsBackupDir "daily"
+    $backupFile = Join-Path $dailyDir "labels_${date}.db"
+    $containerBackupPath = "/tmp/labels_backup_${date}.db"
+
+    Write-Log "Creating Label Service backup (VACUUM INTO)..." -Level INFO
+    Write-Log "Output: $backupFile" -Level INFO
+
+    try {
+        $startTime = Get-Date
+
+        # Use VACUUM INTO for a consistent snapshot without stopping the container
+        docker exec $script:LabelsContainer sqlite3 /data/labels.db "VACUUM INTO '$containerBackupPath';" 2>&1 | Out-Null
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "VACUUM INTO failed" -Level ERROR
+            return $null
+        }
+
+        # Check file was created
+        $dumpSize = docker exec $script:LabelsContainer stat -c%s $containerBackupPath 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Backup file not created in container" -Level ERROR
+            return $null
+        }
+
+        Write-Log "Backup created: $([math]::Round([int64]$dumpSize / 1MB, 2)) MB" -Level INFO
+
+        # Copy from container to host
+        docker cp "${script:LabelsContainer}:${containerBackupPath}" $backupFile 2>&1 | Out-Null
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Failed to copy backup from container" -Level ERROR
+            return $null
+        }
+
+        # Cleanup container files
+        docker exec $script:LabelsContainer rm -f $containerBackupPath 2>&1 | Out-Null
+
+        $fileSize = (Get-Item $backupFile).Length
+        $duration = ((Get-Date) - $startTime).TotalSeconds
+
+        Write-Log "Labels backup completed in $([math]::Round($duration, 1)) seconds" -Level SUCCESS
+        Write-Log "File size: $([math]::Round($fileSize / 1MB, 2)) MB" -Level INFO
+
+        return $backupFile
+    }
+    catch {
+        Write-Log "Labels backup failed: $_" -Level ERROR
+
+        # Cleanup
+        docker exec $script:LabelsContainer rm -f $containerBackupPath 2>&1 | Out-Null
+        if (Test-Path $backupFile) { Remove-Item $backupFile -Force }
+
+        return $null
+    }
+}
+
+function Remove-OldLabelsBackups {
+    Write-Log "Cleaning up old Labels backups (retention: $script:DailyRetentionDays days)..." -Level INFO
+
+    $dailyDir = Join-Path $script:LabelsBackupDir "daily"
+    $cutoffDate = (Get-Date).AddDays(-$script:DailyRetentionDays)
+
+    $oldFiles = Get-ChildItem -Path $dailyDir -Filter "labels_*.db" -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -lt $cutoffDate }
+
+    if ($oldFiles) {
+        foreach ($file in $oldFiles) {
+            Write-Log "Removing: $($file.Name)" -Level INFO
+            Remove-Item $file.FullName -Force
+        }
+        Write-Log "Removed $($oldFiles.Count) old Labels backup(s)" -Level SUCCESS
+    }
+    else {
+        Write-Log "No old Labels backups to remove" -Level INFO
+    }
+}
+
+function Send-LabelsToGoogleDrive {
+    param([string]$BackupFile)
+
+    Write-Log "Uploading Labels backup to Google Drive..." -Level INFO
+
+    $fileName = Split-Path $BackupFile -Leaf
+    $weeklyName = $fileName -replace "\.db$", "_weekly.db"
+
+    try {
+        $startTime = Get-Date
+
+        # Ensure labels subdirectory exists on remote
+        rclone mkdir "${script:RcloneRemote}:${script:RcloneRemotePath}/labels" 2>&1 | Out-Null
+
+        rclone copy $BackupFile "${script:RcloneRemote}:${script:RcloneRemotePath}/labels/" --progress 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Labels rclone upload failed" -Level ERROR
+            return $false
+        }
+
+        # Rename to weekly
+        rclone moveto "${script:RcloneRemote}:${script:RcloneRemotePath}/labels/$fileName" `
+                     "${script:RcloneRemote}:${script:RcloneRemotePath}/labels/$weeklyName" 2>&1
+
+        $duration = ((Get-Date) - $startTime).TotalSeconds
+        Write-Log "Labels upload completed in $([math]::Round($duration, 1)) seconds" -Level SUCCESS
+
+        return $true
+    }
+    catch {
+        Write-Log "Labels upload failed: $_" -Level ERROR
+        return $false
+    }
+}
+
+function Invoke-LabelsDailyBackup {
+    Write-Log "Starting Label Service DAILY backup..." -Level INFO
+
+    # Check prerequisites
+    if (-not (Test-LabelsPrerequisites)) {
+        return $false
+    }
+
+    # Create backup
+    $backupFile = New-LabelsBackup
+    if (-not $backupFile) {
+        return $false
+    }
+
+    # Cleanup old backups
+    Remove-OldLabelsBackups
+
+    return $true
+}
+
+function Invoke-LabelsWeeklyBackup {
+    Write-Log "Starting Label Service WEEKLY backup..." -Level INFO
+
+    # First run daily backup
+    $dailySuccess = Invoke-LabelsDailyBackup
+    if (-not $dailySuccess) {
+        return $false
+    }
+
+    # Get the backup file we just created
+    $dailyDir = Join-Path $script:LabelsBackupDir "daily"
+    $latestBackup = Get-ChildItem -Path $dailyDir -Filter "labels_*.db" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if (-not $latestBackup) {
+        Write-Log "No Labels backup file found to upload" -Level ERROR
+        return $false
+    }
+
+    # Upload to Google Drive
+    $uploaded = Send-LabelsToGoogleDrive -BackupFile $latestBackup.FullName
+    if (-not $uploaded) {
+        return $false
+    }
+
+    return $true
+}
+
+#endregion
+
 #region Main
 
 function Invoke-DailyBackup {
@@ -1160,6 +1385,9 @@ function Main {
         if ($IncludeMySQL) {
             $backupTargets += "MySQL"
         }
+        if ($IncludeLabels) {
+            $backupTargets += "Label Service"
+        }
         if ($IncludeFasten) {
             $backupTargets += "Fasten Health"
         }
@@ -1180,6 +1408,7 @@ function Main {
 
     $infraSuccess = $true
     $mysqlSuccess = $true
+    $labelsSuccess = $true
     $fastenSuccess = $true
 
     # Check prerequisites for ra-infrastructure (unless FastenOnly)
@@ -1223,6 +1452,16 @@ Consolidated Backup
         }
     }
 
+    # Run Label Service backup if requested
+    if ($IncludeLabels) {
+        Write-Log "" -Level INFO
+        Write-Log "=" * 40 -Level INFO
+        $labelsSuccess = switch ($Type) {
+            "daily" { Invoke-LabelsDailyBackup }
+            "weekly" { Invoke-LabelsWeeklyBackup }
+        }
+    }
+
     # Run Fasten Health backup if requested
     if ($IncludeFasten -or $FastenOnly) {
         Write-Log "" -Level INFO
@@ -1246,6 +1485,10 @@ Consolidated Backup
     if ($IncludeMySQL -and -not $mysqlSuccess) {
         $overallSuccess = $false
         $failedTargets += "MySQL"
+    }
+    if ($IncludeLabels -and -not $labelsSuccess) {
+        $overallSuccess = $false
+        $failedTargets += "Label Service"
     }
     if (($IncludeFasten -or $FastenOnly) -and -not $fastenSuccess) {
         $overallSuccess = $false

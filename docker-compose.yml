@@ -42,7 +42,7 @@ services:
   ra_postgres:
     image: postgres:16-alpine
     container_name: ra_postgres
-    restart: "no"
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -67,7 +67,7 @@ services:
   ra_mysql:
     image: mysql:8.0
     container_name: ra_mysql
-    restart: "no"
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: snipeit
@@ -92,7 +92,7 @@ services:
   ra_eventlog_db:
     image: postgres:16-alpine
     container_name: ra_eventlog_db
-    restart: "no"
+    restart: unless-stopped
     environment:
       POSTGRES_USER: eventlog
       POSTGRES_PASSWORD: ${EVENTLOG_DB_PASSWORD:-eventlog_secret}
@@ -120,7 +120,7 @@ services:
   ra_snipeit:
     image: snipe/snipe-it:v8.3.7
     container_name: ra_snipeit
-    restart: "no"
+    restart: unless-stopped
     depends_on:
       ra_mysql:
         condition: service_healthy
@@ -133,6 +133,12 @@ services:
       - ra_snipeit_logs:/var/www/html/storage/logs
     networks:
       - ra_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -141,7 +147,7 @@ services:
   ra_fasten:
     image: ghcr.io/fastenhealth/fasten-onprem:main
     container_name: ra_fasten
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "9091:8080"
     volumes:
@@ -151,6 +157,12 @@ services:
       - ./fasten/config.yaml:/opt/fasten/config/config.yaml:ro
     networks:
       - ra_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -159,7 +171,7 @@ services:
   ra_eventlog:
     image: daily-event-log:latest
     container_name: ra_eventlog
-    restart: "no"
+    restart: unless-stopped
     depends_on:
       ra_eventlog_db:
         condition: service_healthy
@@ -185,7 +197,7 @@ services:
       context: ../snipeit-asset-management/src/label-service
       dockerfile: Dockerfile
     container_name: ra_labels
-    restart: "no"
+    restart: unless-stopped
     environment:
       - LABEL_SERVICE_ENV=production
       - LABEL_SERVICE_DB_PATH=/data/labels.db
@@ -213,7 +225,7 @@ services:
   ra_dashboard:
     image: nginx:alpine
     container_name: ra_dashboard
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "8088:80"
     volumes:
@@ -232,7 +244,7 @@ services:
   ra_traefik:
     image: traefik:v3.2
     container_name: ra_traefik
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "8070:80"
     volumes:
@@ -248,7 +260,7 @@ services:
   ra_gatus:
     image: twinproduction/gatus:latest
     container_name: ra_gatus
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "8085:8080"
     volumes:

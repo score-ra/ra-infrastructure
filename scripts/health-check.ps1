@@ -301,6 +301,13 @@ $script:Containers = @(
         Critical    = $false
         HasHealth   = $true
         TestQuery   = $null
+    },
+    @{
+        Name        = $env:RA_LABELS_CONTAINER
+        DisplayName = "Label Service"
+        Critical    = $false
+        HasHealth   = $true
+        HttpCheck   = "http://localhost:$($env:RA_LABELS_PORT)/health"
     }
 )
 
