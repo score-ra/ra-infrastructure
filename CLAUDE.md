@@ -20,3 +20,5 @@
 - Root `docker-compose.yml` is the active compose file
 - CLI uses Typer, installed via `cd cli && pip install -e ".[dev]"`
 - Config in `config/infrastructure.env`, secrets in `.env` (git-ignored)
+- Docker Desktop settings: `%APPDATA%/Docker/settings-store.json` (AutoStart, etc.)
+- `ghcr.io/fastenhealth/fasten-onprem:main` is a distroless image — no shell, curl, wget, or standard Unix utilities. Healthchecks must be disabled or use the app binary.
