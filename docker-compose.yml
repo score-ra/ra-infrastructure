@@ -158,11 +158,7 @@ services:
     networks:
       - ra_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "-k", "https://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      start_period: 30s
-      retries: 3
+      disable: true
     deploy:
       resources:
         limits:
@@ -177,6 +173,8 @@ services:
         condition: service_healthy
     env_file:
       - ../ra-life-tracker/.env
+    environment:
+      DATABASE_URL: postgresql://eventlog:sqev%2FZRD%2BuP97zgMUoCRfNRb%2FLDjzT1z@ra_eventlog_db:5432/event_log
     ports:
       - "8089:8000"
     networks:
